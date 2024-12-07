@@ -1,9 +1,11 @@
 const express = require('express');
 const verifyToken = require('../middlewares/authMiddleware'); // import the middleware
+
 const router = express.Router();
 
 const db = require('../config/db'); // imports the database connection
 
+// get user profile route
 router.get('/profile', verifyToken, async (req, res) => {
     try {
         const userId = req.user.user_id; // access the user ID from the token

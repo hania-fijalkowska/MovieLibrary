@@ -13,6 +13,7 @@ const app = express(); // app - instance of Express application, used to define 
 app.use(cors()); // enables CORS
 app.use(express.json()); // parses JSON request bodies
 
+// rutes
 app.use('/api/v1', authRoutes); // auth routes
 app.use('/api/v1/user', userRoutes); // user routes
 app.use('/api/v1/movie', movieRoutes); // movie routes

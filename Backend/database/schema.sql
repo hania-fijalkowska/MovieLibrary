@@ -27,7 +27,7 @@ CREATE TABLE User(
     email VARCHAR(50) NOT NULL UNIQUE,
     username VARCHAR(20) NOT NULL UNIQUE,
     password VARCHAR(200) NOT NULL,
-    access_level ENUM('user', 'moderator', 'admin') DEFAULT 'user' -- mozna usunac DEFAULT 'user'
+    access_level ENUM('user', 'moderator', 'admin') DEFAULT 'user' -- mozna usunac DEFAULT 'user' BO I TAK SPRAWDZA SIE POTEM
 );
 
 CREATE TABLE Director(
