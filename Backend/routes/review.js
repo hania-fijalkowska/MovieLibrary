@@ -21,21 +21,15 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
-        // start a transaction
-        await db.beginTransaction();
-
         // insert or update review (if provided)
-        const reviewQuery = `
+        const query = `
             INSERT INTO Review (user_id, movie_id, review)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE review = ?;
         `;
-        await db.execute(reviewQuery, [
+        await db.execute(query, [
             req.user.user_id, movieId, review, review,
         ]);
-
-        // commit transaction
-        await db.commit();
 
         res.status(200).json({
             success: true,
@@ -43,8 +37,6 @@ router.post('/:movieId', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
-        // rollback transaction in case of error
-        await db.rollback();
         console.error('Error adding/updating review:', error);
         res.status(500).json({
             success: false,
@@ -59,15 +51,12 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
     const { movieId } = req.params;
 
     try {
-        // start a transaction
-        await db.beginTransaction();
-
         // delete the review from the Review table
-        const reviewQuery = `
+        const query = `
             DELETE FROM Review
             WHERE user_id = ? AND movie_id = ?;
         `;
-        const [result] = await db.execute(reviewQuery, [req.user.user_id, movieId]);
+        const [result] = await db.execute(query, [req.user.user_id, movieId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -76,17 +65,12 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
             });
         }
 
-        // commit transaction
-        await db.commit();
-
         res.status(200).json({
             success: true,
             message: 'Review deleted successfully!'
         });
 
     } catch (error) {
-        // rollback transaction in case of error
-        await db.rollback();
         console.error('Error deleting review:', error);
         res.status(500).json({
             success: false,
