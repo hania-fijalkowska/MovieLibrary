@@ -63,6 +63,8 @@ router.put('/profile', verifyToken, async (req, res) => {
 
     // retrieve the user's current data from the database
     try {
+        await db.beginTransaction(); // start transaction
+
         const [user] = await db.execute('SELECT * FROM User WHERE user_id = ?', [userId]);
 
         if (!user.length) {
@@ -75,7 +77,11 @@ router.put('/profile', verifyToken, async (req, res) => {
         // check if the provided password matches the current password in the database
         const doesPasswordMatch = await bcrypt.compare(password, user[0].password);
         if (!doesPasswordMatch) {
-            return res.status(401).json({ message: 'Invalid password!' });
+            await db.rollback();
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid password!'
+            });
         }
 
         // check if the new username is already taken by another user (excluding the current user)
@@ -85,6 +91,7 @@ router.put('/profile', verifyToken, async (req, res) => {
         );
 
         if (existingUser.length > 0) {
+            await db.rollback();
             return res.status(409).json({
                 success: false,
                 message: 'Username already exists.',
@@ -98,12 +105,15 @@ router.put('/profile', verifyToken, async (req, res) => {
         const query = `UPDATE User SET username = ?, password = ? WHERE user_id = ?`;
         await db.execute(query, [newUsername, hashedPassword, userId]);
 
+        await db.commit(); // commit transaction
+
         res.status(200).json({
             success: true,
             message: 'Profile updated successfully.',
         });
 
     } catch (error) {
+        await db.rollback(); // rollback on error
         console.error('Error updating profile:', error);
         res.status(500).json({
             success: false,
@@ -124,6 +134,7 @@ router.delete('/profile', verifyToken, async (req, res) => {
         );
 
         if (existingUser.length === 0) {
+            await db.rollback(); // rollback on error
             return res.status(404).json({
                 success: false,
                 message: 'User not found.',
@@ -133,12 +144,15 @@ router.delete('/profile', verifyToken, async (req, res) => {
         // delete the user
         await db.execute('DELETE FROM User WHERE user_id = ?', [userId]);
 
+        await db.commit(); // commit transaction
+
         res.status(200).json({
             success: true,
             message: 'User profile deleted successfully.',
         });
 
     } catch (error) {
+        await db.rollback(); // rollback on error
         console.error('Error deleting profile:',error);
         res.status(500).json({
             success: false,
