@@ -7,18 +7,32 @@ const router = express.Router();
 
 // add or update review for a movie
 router.post('/:movieId', verifyToken, async (req, res) => {
-    const { movieId } = req.params;
+    const movieId = Number(req.params.movieId);
     const { review } = req.body; // review up to 200 words
 
-    if (review) {
-        const reviewWords = review.split(/\s+/); // split by whitespace
-        if (reviewWords.length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: 'Review must be less than or equal to 200 words.'
-            });
-        }
+    if (isNaN(movieId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid movie ID.'
+        });
     }
+
+    if (!review || review.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            message: 'Review cannot be empty.'
+        });
+    }
+
+    
+    const reviewWords = review.trim().split(/\s+/); // split by whitespace
+    if (reviewWords.length > 200) {
+        return res.status(400).json({
+            success: false,
+            message: 'Review must be less than or equal to 200 words.'
+        });
+    }
+    
 
     try {
         // insert or update review (if provided)
@@ -27,9 +41,8 @@ router.post('/:movieId', verifyToken, async (req, res) => {
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE review = ?;
         `;
-        await db.execute(query, [
-            req.user.user_id, movieId, review, review,
-        ]);
+
+        await db.execute(query, [req.user.user_id, movieId, review, review,]);
 
         res.status(200).json({
             success: true,
@@ -48,7 +61,14 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 
 // delete a user's review
 router.delete('/:movieId', verifyToken, async (req, res) => {
-    const { movieId } = req.params;
+    const movieId = Number(req.params.movieId);
+
+    if (isNaN(movieId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid movie ID.'
+        });
+    }
 
     try {
         // delete the review from the Review table

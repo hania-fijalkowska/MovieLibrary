@@ -6,13 +6,20 @@ const router = express.Router();
 
 // add or update score for a movie
 router.post('/:movieId', verifyToken, async (req, res) => {
-    const { movieId } = req.params;
+    const movieId = Number(req.params.movieId);
     const { score } = req.body; // score between 1 and 10
 
-    if (!score || score < 1 || score > 10) {
+    if (isNaN(movieId)) {
         return res.status(400).json({
             success: false,
-            message: 'Score must be between 1 and 10.'
+            message: 'Invalid movie ID.'
+        });
+    }
+
+    if (typeof score !== 'number' || score < 1 || score > 10) {
+        return res.status(400).json({
+            success: false,
+            message: 'Score must be a number between 1 and 10.'
         });
     }
 
@@ -21,21 +28,21 @@ router.post('/:movieId', verifyToken, async (req, res) => {
         await db.beginTransaction();
 
         // insert or update score
-        const scoreQuery = `
+        const query = `
             INSERT INTO Score (user_id, movie_id, score)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE score = ?;
         `;
-        await db.execute(scoreQuery, [
-            req.user.user_id, movieId, score, score,
-        ]);
+
+        await db.execute(query, [req.user.user_id, movieId, score, score,]);
 
         // recalculate average rating
         const avgQuery = `
             UPDATE Movie
-            SET rating = (SELECT AVG(score) FROM Score WHERE movie_id = ?)
+            SET rating = COALESCE((SELECT AVG(score) FROM Score WHERE movie_id = ?), 0)
             WHERE movie_id = ?;
         `;
+
         await db.execute(avgQuery, [movieId, movieId]);
 
         // commit transaction
@@ -59,7 +66,14 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 
 // delete a user's score
 router.delete('/:movieId', verifyToken, async (req, res) => {
-    const { movieId } = req.params;
+    const movieId = Number(req.params.movieId);
+
+    if (isNaN(movieId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid movie ID.'
+        });
+    }
 
     try {
         // start a transaction
@@ -82,9 +96,10 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
         // recalculate average rating for the movie
         const avgQuery = `
             UPDATE Movie
-            SET rating = (SELECT AVG(score) FROM Score WHERE movie_id = ?)
+            SET rating = COALESCE((SELECT AVG(score) FROM Score WHERE movie_id = ?), 0)
             WHERE movie_id = ?;
         `;
+
         await db.execute(avgQuery, [movieId, movieId]);
 
         // commit transaction
