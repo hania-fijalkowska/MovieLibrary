@@ -10,7 +10,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     const movieId = Number(req.params.movieId);
     const { review } = req.body; // review up to 200 words
 
-    if (isNaN(movieId)) {
+    if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid movie ID.'
@@ -63,7 +63,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 router.delete('/:movieId', verifyToken, async (req, res) => {
     const movieId = Number(req.params.movieId);
 
-    if (isNaN(movieId)) {
+    if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid movie ID.'

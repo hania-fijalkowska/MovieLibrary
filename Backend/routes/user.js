@@ -1,23 +1,24 @@
 const express = require('express');
 const verifyToken = require('../middlewares/authMiddleware'); // import the middleware
+const getPaginationParams = require('../utils/pagination');
 const bcrypt = require('bcryptjs'); // for password hashing
-const validator = require('validator'); // for email vaildation
+// const validator = require('validator'); // for email vaildation
 
 const router = express.Router();
 const db = require('../config/db'); // imports the database connection
 
 // get user profile
 router.get('/profile', verifyToken, async (req, res) => {
+    const userId = Number(req.user.user_id); // access the user ID from the token
+
+    if (!userId || isNaN(userId)) {
+        return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID in token.'
+        });
+    }
+
     try {
-        const userId = req.user.user_id; // access the user ID from the token
-
-        if (!userId || isNaN(userId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid user ID in token.'
-            });
-        }
-
         const query = `
             SELECT user_id, email, username, access_level
             FROM User
@@ -52,7 +53,14 @@ router.get('/profile', verifyToken, async (req, res) => {
 router.put('/profile', verifyToken, async (req, res) => {
     const { newUsername, password, newPassword } = req.body;  // expecting the new username and new password
 
-    const userId = req.user.user_id; // access the user ID from the token
+    const userId = Number(req.user.user_id); // access the user ID from the token
+
+    if (!userId || isNaN(userId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid user ID in token.'
+        });
+    }
 
     if (!newUsername || !password || !newPassword) {
         return res.status(400).json({
@@ -61,10 +69,14 @@ router.put('/profile', verifyToken, async (req, res) => {
         });
     }
 
-    // retrieve the user's current data from the database
+    if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long!' });
+    }
+
     try {
         await db.beginTransaction(); // start transaction
 
+        // retrieve the user's current data from the database
         const [user] = await db.execute('SELECT * FROM User WHERE user_id = ?', [userId]);
 
         if (!user.length) {
@@ -124,25 +136,30 @@ router.put('/profile', verifyToken, async (req, res) => {
 
 // delete user profile
 router.delete('/profile', verifyToken, async (req, res) => {
+
+    const userId = Number(req.user.user_id); // extract user ID from token
+
+        if (!userId || isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID in token.'
+            });
+        }
+
     try {
-        const userId = req.user.user_id; // extract user ID from token
+        await db.beginTransaction(); // start transaction
 
-        // check if the user exists
-        const [existingUser] = await db.execute(
-            'SELECT user_id FROM User WHERE user_id = ?',
-            [userId]
-        );
+        // attempt to delete the user
+        const [ result ] = await db.execute('DELETE FROM User WHERE user_id = ?', [userId]);
 
-        if (existingUser.length === 0) {
-            await db.rollback(); // rollback on error
+        if (result.affectedRows === 0) {
+            // no rows were deleted, meaning the user does not exist
+            await db.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'User not found.',
             });
         }
-
-        // delete the user
-        await db.execute('DELETE FROM User WHERE user_id = ?', [userId]);
 
         await db.commit(); // commit transaction
 
@@ -163,14 +180,15 @@ router.delete('/profile', verifyToken, async (req, res) => {
 
 // get user reviews and scores - RATINGS (with pagination)
 router.get('/profile/ratings', verifyToken, async (req, res) => {
-    const userId = req.user.user_id;
+    const userId = Number(req.user.user_id); // extract user ID from token
+    const { limit, offset } = getPaginationParams(req);
 
-    let page = parseInt(req.query.page) || 1;
-    let limit = 10;
-
-    if (page <= 0) page = 1;
-
-    const offset = (page - 1) * limit;
+    if (!userId || isNaN(userId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid user ID in token.'
+        });
+    }
 
     try {
         const query = `

@@ -9,7 +9,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     const movieId = Number(req.params.movieId);
     const { score } = req.body; // score between 1 and 10
 
-    if (isNaN(movieId)) {
+    if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid movie ID.'
@@ -24,8 +24,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
-        // start a transaction
-        await db.beginTransaction();
+        await db.beginTransaction(); // start a transaction
 
         // insert or update score
         const query = `
@@ -45,8 +44,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 
         await db.execute(avgQuery, [movieId, movieId]);
 
-        // commit transaction
-        await db.commit();
+        await db.commit(); // commit transaction
 
         res.status(200).json({
             success: true,
@@ -54,8 +52,8 @@ router.post('/:movieId', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
-        // rollback transaction in case of error
-        await db.rollback();
+        await db.rollback(); // rollback transaction in case of error
+
         console.error('Error adding/updating score:', error);
         res.status(500).json({
             success: false,
@@ -68,7 +66,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 router.delete('/:movieId', verifyToken, async (req, res) => {
     const movieId = Number(req.params.movieId);
 
-    if (isNaN(movieId)) {
+    if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid movie ID.'
@@ -76,8 +74,7 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
-        // start a transaction
-        await db.beginTransaction();
+        await db.beginTransaction(); // start a transaction
 
         // delete the score from the Score table
         const query = `
@@ -102,8 +99,7 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
 
         await db.execute(avgQuery, [movieId, movieId]);
 
-        // commit transaction
-        await db.commit();
+        await db.commit(); // commit transaction
 
         res.status(200).json({
             success: true,
@@ -111,8 +107,8 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
-        // rollback transaction in case of error
-        await db.rollback();
+        await db.rollback(); // rollback transaction in case of error
+
         console.error('Error deleting score:', error);
         res.status(500).json({
             success: false,

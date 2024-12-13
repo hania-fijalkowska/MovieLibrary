@@ -26,7 +26,7 @@ CREATE TABLE Movie(
     title VARCHAR(100) NOT NULL,
     episodes INT,
     synopsis TEXT DEFAULT NULL,
-    score DECIMAL(2, 3) DEFAULT NULL
+    score DECIMAL(3, 1) DEFAULT NULL
 );
 
 CREATE TABLE User(
