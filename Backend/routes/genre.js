@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const { limit, offset } = getPaginationParams(req);
 
     try {
-        const query = `SELECT DISTINCT genre FROM Genre LIMIT ? OFFSET ?`;
+        const query = `SELECT genre_name FROM Genre LIMIT ? OFFSET ?`;
         const [rows] = await db.execute(query, [limit, offset]);
 
         if (!rows.length) {
@@ -39,7 +39,6 @@ router.get('/', async (req, res) => {
 // get all genres for a movie
 router.get('/:movieId', async (req, res) => {
     const movieId = Number(req.params.movieId);
-
     const { limit, offset } = getPaginationParams(req);
 
     if (!movieId || isNaN(movieId)) {
@@ -50,7 +49,13 @@ router.get('/:movieId', async (req, res) => {
     }
 
     try {
-        const query = `SELECT genre FROM Genre WHERE movie_id = ? LIMIT ? OFFSET ?`;
+        const query = `
+        SELECT g.genre_name
+        FROM Genre g
+        JOIN Movie_Genre mg ON g.genre_id = mg.genre_id 
+        WHERE mg.movie_id = ? LIMIT ? OFFSET ?
+        `;
+
         const [rows] = await db.execute(query, [movieId, limit, offset]);
 
         if (!rows.length) {
@@ -83,10 +88,11 @@ router.get('/movies/:genre', async (req, res) => {
 
     try {
         const query = `
-            SELECT m.movie_id, m.title, m.synopsis, m.rating 
+            SELECT m.movie_id, m.title, m.synopsis, m.score
             FROM Movie m
-            JOIN Genre g ON m.movie_id = g.movie_id
-            WHERE g.genre = ? LIMIT ? OFFSET ?;
+            JOIN Movie_Genre mg ON m.movie_id = mg.movie_id
+            JOIN Genre g ON mg.genre_id = g.genre_id
+            WHERE g.genre_name = ? LIMIT ? OFFSET ?;
         `;
         const [rows] = await db.execute(query, [genre, limit, offset]);
 
@@ -132,9 +138,29 @@ router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
 
     try {
         await db.beginTransaction(); // start a transaction
-        const query = `INSERT INTO Genre (movie_id, genre) VALUES (?, ?)`;
 
-        await db.execute(query, [movieId, genre]);
+        const getGenreIdQuery = `
+        SELECT genre_id FROM Genre WHERE genre_name = ?
+        `;
+
+
+
+        const [ genres ] = await db.execute(getGenreIdQuery, [genre]);
+
+        if(!genres.length){
+            return res.status(404).json({
+                success: false,
+                message: 'Genre not found.'
+            });
+        }
+
+        const genreId = genres[0].genre_id;
+
+        const insertMovieGenreQuery = `
+            INSERT INTO Movie_Genre (movie_id, genre_id) VALUES (?, ?)
+        `;
+
+        await db.execute(insertMovieGenreQuery, [movieId, genreId]);
         await db.commit(); // commit transaction
 
         res.status(200).json({
@@ -173,13 +199,35 @@ router.put('/update', verifyToken, checkRole('moderator'), async (req, res) => {
 
     try {
         await db.beginTransaction(); // start a transaction
-        const query = `UPDATE Genre SET genre = ? WHERE movie_id = ? AND genre = ?`;
-        const [result] = await db.execute(query, [newGenre, movieId, oldGenre]);
+
+        const getOldGenreId = `SELECT genre_id FROM Genre WHERE genre_name = ?`;
+        const getNewGenreId = `SELECT genre_id FROM Genre WHERE genre_name = ?`;
+
+        const [oldGenreResult] = await db.execute(getOldGenreId, [oldGenre]);
+        const [newGenreResult] = await db.execute(getNewGenreId, [newGenre]);
+
+        if (!oldGenreResult.length || !newGenreResult.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invalid old or new genre name.',
+            });
+        }
+
+        const oldGenreId = oldGenreResult[0].genre_id;
+        const newGenreId = newGenreResult[0].genre_id;
+
+        const updateGenreQuery = `
+        UPDATE Movie_Genre
+        SET genre_id = ?
+        WHERE movie_id = ? AND genre_id = ?
+        `;
+
+        const [result] = await db.execute(updateGenreQuery, [newGenreId, movieId, oldGenreId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'Genre not found for the specified movie.'
+                message: 'Genre not found for the specified movie.',
             });
         }
 
@@ -221,21 +269,45 @@ router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) =
 
     try {
         await db.beginTransaction(); // start a transaction
-        const query = `DELETE FROM Genre WHERE movie_id = ? AND genre = ?`;
-        await db.execute(query, [movieId, genre]);
+
+        // resolve genre_id from genre_name
+        const genreQuery = `SELECT genre_id FROM Genre WHERE genre_name = ?`;
+        const [genreResult] = await db.execute(genreQuery, [genre]);
+
+        if (!genreResult.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'Genre not found.',
+            });
+        }
+
+        const genreId = genreResult[0].genre_id;
+
+        // Delete the genre association from Movie_Genre
+        const deleteQuery = `DELETE FROM Movie_Genre WHERE movie_id = ? AND genre_id = ?`;
+        const [deleteResult] = await db.execute(deleteQuery, [movieId, genreId]);
+
+        if (deleteResult.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Genre not associated with the specified movie.',
+            });
+        }
+
         await db.commit(); // commit transaction
 
         res.status(200).json({
             success: true,
-            message: 'Genre removed from movie successfully!'
+            message: 'Genre removed from movie successfully!',
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-        console.error('Error deleting genre from movie: ', error);
+        await db.rollback(); // rollback transaction on error
+
+        console.error('Error deleting genre from movie:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to remove genre from movie.'
+            message: 'Failed to remove genre from movie.',
         });
     }
 });
