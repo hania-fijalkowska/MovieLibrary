@@ -35,6 +35,15 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     
 
     try {
+        // ensure movieId exists
+        const [movieExists] = await db.execute('SELECT 1 FROM Movie WHERE movie_id = ?', [movieId]);
+        if (!movieExists.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'Movie not found.',
+            });
+        }
+
         // insert or update review (if provided)
         const query = `
             INSERT INTO Review (user_id, movie_id, review)
@@ -71,6 +80,16 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
+
+        // Ensure movieId exists
+        const [movieExists] = await db.execute('SELECT 1 FROM Movie WHERE movie_id = ?', [movieId]);
+        if (!movieExists.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'Movie not found.',
+            });
+        }
+        
         // delete the review from the Review table
         const query = `
             DELETE FROM Review

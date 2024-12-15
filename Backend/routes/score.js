@@ -24,6 +24,15 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
+        // check if movieId exists in the Movie table
+        const [movieCheck] = await db.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
+        if (!movieCheck.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'Movie not found.'
+            });
+        }
+
         await db.beginTransaction(); // start a transaction
 
         // insert or update score
@@ -74,6 +83,15 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
+        // check if movieId exists in the Movie table
+        const [movieCheck] = await db.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
+        if (!movieCheck.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'Movie not found.'
+            });
+        }
+        
         await db.beginTransaction(); // start a transaction
 
         // delete the score from the Score table

@@ -9,6 +9,13 @@ const router = express.Router();
 router.get('/movie/:movieId', async (req, res) => {
     const { movieId } = req.params;
 
+    if (!movieId || isNaN(movieId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid movie ID.'
+        });
+    }
+
     try {
         const query = `
             SELECT p.person_id, p.first_name, p.last_name, p.gender, p.birth_year, p.birth_country 
@@ -19,19 +26,37 @@ router.get('/movie/:movieId', async (req, res) => {
         const [rows] = await db.execute(query, [movieId]);
 
         if (rows.length === 0) {
-            return res.status(404).json({ message: 'No directors found for this movie.' });
+            return res.status(404).json({
+                success: false,
+                message: 'No directors found for this movie.'
+            });
         }
 
-        res.status(200).json(rows);
+        res.status(200).json({
+            success: true,
+            message: 'Directors: ',
+            data: rows
+        });
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to fetch directors for the movie.' });
+        console.error('Error fetching directors for the movie: ', error);
+        res.status(500).json({
+            succcess: false,
+            message: 'Failed to fetch directors for the movie.'
+        });
     }
 });
 
 // get all movies for a specific director
 router.get('/person/:personId', async (req, res) => {
     const { personId } = req.params;
+
+    if (!personId || isNaN(personId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid person ID.'
+        });
+    }
 
     try {
         const query = `

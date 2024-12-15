@@ -111,6 +111,7 @@ router.get('/movies/:genre', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching movies for a genre: ', error);
+        
         res.status(500).json({ 
             success: false,
             message: 'Failed to fetch movies for a genre.'

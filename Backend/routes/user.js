@@ -136,7 +136,6 @@ router.put('/profile', verifyToken, async (req, res) => {
 
 // delete user profile
 router.delete('/profile', verifyToken, async (req, res) => {
-
     const userId = Number(req.user.user_id); // extract user ID from token
 
         if (!userId || isNaN(userId)) {
@@ -178,7 +177,7 @@ router.delete('/profile', verifyToken, async (req, res) => {
     }
 });
 
-// get user reviews and scores - RATINGS (with pagination)
+// get user reviews and scores (with pagination)
 router.get('/profile/ratings', verifyToken, async (req, res) => {
     const userId = Number(req.user.user_id); // extract user ID from token
     const { limit, offset } = getPaginationParams(req);

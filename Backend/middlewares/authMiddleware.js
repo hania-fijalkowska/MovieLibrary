@@ -1,52 +1,37 @@
 const jwt = require('jsonwebtoken');
 
-// middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({
-            success: false,
-            message: 'Authorization header missing or malformed.'
-        });
-    }
-
-    const token = authHeader.split(' ')[1]; // extract token from "Bearer <token>"
-
-    if (!token) {
-        return res.status(401).json({
-            success: false,
-            message: 'No token provided. Access denied.'
-        });
-    }
-
-    if (!process.env.JWT_SECRET) {
-        console.error('JWT_SECRET is not defined in environment variables.');
-        return res.status(500).json({
-            success: false,
-            message: 'Server configuration error.'
-        });
-    }
-
-
+// verifyToken middleware
+module.exports = async (req, res, next) => {
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // verify token
-        req.user = decoded; // attach user information to the request object
-        next(); // move to the next middleware or route handler
-    } catch (error) {
-        console.error('Token verification error:', error);
-        if(error.name === 'TokenExpiredError'){
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader) {
             return res.status(401).json({
                 success: false,
-                message: 'Token has expired. Please log in again.'
+                message: 'Access token required.'
             });
         }
 
-        res.status(403).json({
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not configured');
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded.user_id) {
+            throw new Error('Invalid user ID in token');
+        }
+
+        req.user = decoded; // Attach user to request
+        next(); // Proceed to the next middleware
+    } catch (err) {
+        console.error('Authentication error:', err.message);
+
+        const status = err.message === 'Token has expired' ? 401 : 400;
+        res.status(status).json({
             success: false,
-            message: 'Invalid token.'
+            message: err.message || 'Authentication failed.'
         });
     }
 };
-
-module.exports = verifyToken;

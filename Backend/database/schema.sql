@@ -2,22 +2,14 @@ DROP DATABASE IF EXISTS Movie_Library_DB;
 CREATE DATABASE Movie_Library_DB;
 USE Movie_Library_DB;
 
-CREATE TABLE Country (
-    country_id INT AUTO_INCREMENT PRIMARY KEY,
-    country_name VARCHAR(50) NOT NULL
-);
-
 CREATE TABLE Person(
     person_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    country_id INT NULL,
 
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     gender ENUM('male', 'female'),
     birth_year YEAR,
-
-    FOREIGN KEY (country_id) REFERENCES Country(country_id) ON DELETE SET NULL ON UPDATE CASCADE
+    birth_country VARCHAR(50)
 );
 
 CREATE TABLE Movie(        
