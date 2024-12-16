@@ -6,13 +6,16 @@ const db = require('../config/db');
 
 const router = express.Router();
 
+
+
 // get all movies
 router.get('/', async (req, res) => {
-    const { limit, offset } = getPaginationParams(req);
+    const { limit, offset, page } = getPaginationParams(req);
 
     try {
-        const query = 'SELECT * FROM Movie LIMIT ? OFFSET ?';
+        const query = `SELECT * FROM Movie LIMIT ? OFFSET ?`; // NIE DZIALA LIMIT OFFSET - niepoprawne argumenty, może byc blad wersji mysql
         const [movies] = await db.execute(query, [limit, offset]);
+
 
         if (!movies.length) {
             return res.status(404).json({
@@ -23,7 +26,7 @@ router.get('/', async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: "Movies: ",
+            message: "Movies retrieved successfully.",
             movies,
             pagination: {
                 page: page,
@@ -33,12 +36,13 @@ router.get('/', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching all movies: ', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             message: 'Failed to fetch movies.'
         });
     }
 });
+
 
 // get a single movie by title
 router.get('/title/:title', async (req, res) => {

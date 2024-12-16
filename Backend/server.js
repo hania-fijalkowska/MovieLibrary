@@ -7,7 +7,7 @@ const authRoutes = require('./routes/auth'); // auth routes
 const userRoutes = require('./routes/user'); // user routes
 const movieRoutes = require('./routes/movie.js'); // movie routes
 const ratingRoutes = require('./routes/review.js'); // rating routes
-const roleRoutes = require('./routes/role.js'); // role routes
+//const roleRoutes = require('./routes/role.js'); // role routes
 const genreRoutes = require('./routes/genre.js'); // genre routes
 const personRoutes = require('./routes/person.js'); // person routes
 const directorRoutes = require('./routes/director.js'); // director routes
@@ -18,12 +18,12 @@ const app = express(); // app - instance of Express application, used to define 
 app.use(cors()); // enables CORS
 app.use(express.json()); // parses JSON request bodies
 
-// rutes
-app.use('/api/v1', authRoutes); // auth routes
+// routes
+app.use('/api/v1', authRoutes); // auth routes,
 app.use('/api/v1/user', userRoutes); // user routes
 app.use('/api/v1/movie', movieRoutes); // movie routes
 app.use('/api/v1/rating', ratingRoutes); // rating routes
-app.use('/api/v1/role', roleRoutes); // role routes
+//app.use('/api/v1/role', roleRoutes); // role routes
 app.use('/api/v1/genre', genreRoutes); // genre routes
 app.use('/api/v1/person', personRoutes); // person routes
 app.use('/api/v1/director', directorRoutes); // director routes

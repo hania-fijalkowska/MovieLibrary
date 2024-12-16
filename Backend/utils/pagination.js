@@ -1,3 +1,4 @@
+
 // utils/pagination.js
 function getPaginationParams(req) {
     const page = parseInt(req.query.page, 10) || 1;
@@ -5,5 +6,6 @@ function getPaginationParams(req) {
     const offset = (page - 1) * limit;
     return { page, limit, offset };
 }
+
 
 module.exports = getPaginationParams;
