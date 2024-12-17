@@ -1,11 +1,12 @@
 const express = require('express');
 const verifyToken = require('../middlewares/authMiddleware');
+const checkRole = require('../middlewares/roleMiddleware');
 const db = require('../config/db');
 
 const router = express.Router();
 
 // add or update score for a movie
-router.post('/:movieId', verifyToken, async (req, res) => {
+router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
     const movieId = Number(req.params.movieId);
     const { score } = req.body; // score between 1 and 10
 
@@ -24,6 +25,8 @@ router.post('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
+        await db.beginTransaction(); // start a transaction
+
         // check if movieId exists in the Movie table
         const [movieCheck] = await db.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
         if (!movieCheck.length) {
@@ -32,8 +35,6 @@ router.post('/:movieId', verifyToken, async (req, res) => {
                 message: 'Movie not found.'
             });
         }
-
-        await db.beginTransaction(); // start a transaction
 
         // insert or update score
         const query = `
@@ -72,7 +73,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 });
 
 // delete a user's score
-router.delete('/:movieId', verifyToken, async (req, res) => {
+router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
     const movieId = Number(req.params.movieId);
 
     if (!movieId || isNaN(movieId)) {
@@ -83,6 +84,8 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
     }
 
     try {
+        await db.beginTransaction(); // start a transaction
+        
         // check if movieId exists in the Movie table
         const [movieCheck] = await db.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
         if (!movieCheck.length) {
@@ -91,8 +94,6 @@ router.delete('/:movieId', verifyToken, async (req, res) => {
                 message: 'Movie not found.'
             });
         }
-        
-        await db.beginTransaction(); // start a transaction
 
         // delete the score from the Score table
         const query = `

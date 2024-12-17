@@ -1,5 +1,6 @@
 const express = require('express');
 const verifyToken = require('../middlewares/authMiddleware'); // import the middleware
+const checkRole = require('../middlewares/roleMiddleware');
 const getPaginationParams = require('../utils/pagination');
 const bcrypt = require('bcryptjs'); // for password hashing
 // const validator = require('validator'); // for email vaildation
@@ -36,6 +37,7 @@ router.get('/profile', verifyToken, async (req, res) => {
 
         res.status(200).json({
             success: true,
+            message: 'User profile: ',
             data: rows[0]
         });
 
@@ -70,12 +72,13 @@ router.put('/profile', verifyToken, async (req, res) => {
     }
 
     if (newPassword.length < 8) {
-        return res.status(400).json({ message: 'Password must be at least 8 characters long!' });
+        return res.status(400).json({
+            success: false,
+            message: 'Password must be at least 8 characters long!'
+        });
     }
 
     try {
-        await db.beginTransaction(); // start transaction
-
         // retrieve the user's current data from the database
         const [user] = await db.execute('SELECT * FROM User WHERE user_id = ?', [userId]);
 
@@ -89,7 +92,6 @@ router.put('/profile', verifyToken, async (req, res) => {
         // check if the provided password matches the current password in the database
         const doesPasswordMatch = await bcrypt.compare(password, user[0].password);
         if (!doesPasswordMatch) {
-            await db.rollback();
             return res.status(401).json({
                 success: false,
                 message: 'Invalid password!'
@@ -98,12 +100,11 @@ router.put('/profile', verifyToken, async (req, res) => {
 
         // check if the new username is already taken by another user (excluding the current user)
         const [existingUser] = await db.execute(
-            'SELECT * FROM User WHERE username = ? AND user_id != ?',
+            'SELECT COUNT(*) as count FROM User WHERE username = ? AND user_id != ?',
             [newUsername, userId]
         );
 
-        if (existingUser.length > 0) {
-            await db.rollback();
+        if (existingUser[0].count > 0) {
             return res.status(409).json({
                 success: false,
                 message: 'Username already exists.',
@@ -117,15 +118,12 @@ router.put('/profile', verifyToken, async (req, res) => {
         const query = `UPDATE User SET username = ?, password = ? WHERE user_id = ?`;
         await db.execute(query, [newUsername, hashedPassword, userId]);
 
-        await db.commit(); // commit transaction
-
         res.status(200).json({
             success: true,
             message: 'Profile updated successfully.',
         });
 
     } catch (error) {
-        await db.rollback(); // rollback on error
         console.error('Error updating profile:', error);
         res.status(500).json({
             success: false,
@@ -146,21 +144,15 @@ router.delete('/profile', verifyToken, async (req, res) => {
         }
 
     try {
-        await db.beginTransaction(); // start transaction
-
         // attempt to delete the user
         const [ result ] = await db.execute('DELETE FROM User WHERE user_id = ?', [userId]);
 
         if (result.affectedRows === 0) {
-            // no rows were deleted, meaning the user does not exist
-            await db.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'User not found.',
             });
         }
-
-        await db.commit(); // commit transaction
 
         res.status(200).json({
             success: true,
@@ -168,7 +160,6 @@ router.delete('/profile', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
-        await db.rollback(); // rollback on error
         console.error('Error deleting profile:',error);
         res.status(500).json({
             success: false,
@@ -178,7 +169,7 @@ router.delete('/profile', verifyToken, async (req, res) => {
 });
 
 // get user reviews and scores (with pagination)
-router.get('/profile/ratings', verifyToken, async (req, res) => {
+router.get('/ratings', verifyToken,  checkRole('user'), async (req, res) => {
     const userId = Number(req.user.user_id); // extract user ID from token
     const { limit, offset } = getPaginationParams(req);
 

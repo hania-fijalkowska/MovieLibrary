@@ -64,6 +64,7 @@ router.get('/title/:title', async (req, res) => {
 
         res.status(200).json({
             success: true,
+            message: 'Movie: ',
             movie: movies[0] // send the first (and only) movie
         });
 

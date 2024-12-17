@@ -8,7 +8,7 @@ const router = express.Router();
 
 // get all cast members for a movie
 router.get('/movie/:movieId/cast', async (req, res) => {
-    const { movieId } = req.params; // sprawdzic movieId
+    const { movieId } = req.params;
     const { limit, offset } = getPaginationParams(req);
 
     if (!movieId || isNaN(movieId)) {

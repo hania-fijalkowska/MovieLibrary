@@ -1,12 +1,13 @@
 const express = require('express');
 const verifyToken = require('../middlewares/authMiddleware');
+const checkRole = require('../middlewares/roleMiddleware');
 const db = require('../config/db');
 
 const router = express.Router();
 
 
 // add or update review for a movie
-router.post('/:movieId', verifyToken, async (req, res) => {
+router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
     const movieId = Number(req.params.movieId);
     const { review } = req.body; // review up to 200 words
 
@@ -69,7 +70,7 @@ router.post('/:movieId', verifyToken, async (req, res) => {
 
 
 // delete a user's review
-router.delete('/:movieId', verifyToken, async (req, res) => {
+router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
     const movieId = Number(req.params.movieId);
 
     if (!movieId || isNaN(movieId)) {

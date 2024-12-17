@@ -23,7 +23,7 @@ const generateToken = (user) => {
 
 // user registration route
 router.post('/register', async (req, res) => { // defines POST route at /api/register
-    const {email, username, password, access_level} = req.body; // extracts email, username, password, access_level from the request body
+    const {email, username, password} = req.body; // extracts email, username, password from the request body
 
     if (!email || !username || !password){
         return res.status(400).json({message: 'Email, username and password are required!'});
@@ -51,20 +51,25 @@ router.post('/register', async (req, res) => { // defines POST route at /api/reg
         const hashed_password = await bcrypt.hash(password, 10); // hashes the password - salt factor of ten
 
         // insert user into database
-        // parametrized query that defines SQL INSERT statement (? - placeholder that are replaced with actual values)
         const query = `
             INSERT INTO User (email, username, password, access_level)
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, 'user')
         `;
 
         // execute the query with provided parameters
-        await db.execute(query, [email, username, hashed_password, access_level || 'user']);
+        await db.execute(query, [email, username, hashed_password]);
         
-        res.status(201).json({ message: 'User registered successfully!' });
+        res.status(201).json({
+            success: true,
+            message: 'User registered successfully!'
+        });
 
     } catch (error) {
         console.error('Registration error: ', error);
-        res.status(500).json({ message: 'Error registering user.' });
+        res.status(500).json({
+            success: false,
+            message: 'Error registering user.'
+        });
     }
 });
 
