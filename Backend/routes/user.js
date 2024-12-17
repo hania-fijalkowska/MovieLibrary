@@ -4,6 +4,8 @@ const checkRole = require('../middlewares/roleMiddleware');
 const getPaginationParams = require('../utils/pagination');
 const bcrypt = require('bcryptjs'); // for password hashing
 // const validator = require('validator'); // for email vaildation
+const checkRole = require('../middlewares/roleMiddleware'); // Import middleware do sprawdzania roli użytkownika
+
 
 const router = express.Router();
 const db = require('../config/db'); // imports the database connection
@@ -209,5 +211,107 @@ router.get('/ratings', verifyToken,  checkRole('user'), async (req, res) => {
         });
     }
 });
+
+
+// get users by username or access level
+router.get('/admin-view/profile/:filter', verifyToken, async (req, res, next) => {
+    const { filter } = req.params;
+
+    // check if the filter is an access level; if yes, require admin role
+    const accessLevels = ['admin', 'moderator', 'user'];
+    if (accessLevels.includes(filter.toLowerCase())) {
+        return checkRole(['admin'])(req, res, next); // Call middleware for admin role
+    }
+
+    next(); // if the filter is not an access level, proceed
+}, async (req, res) => {
+    const { filter } = req.params;
+
+    try {
+        let query, params;
+
+        if (['admin', 'moderator', 'user'].includes(filter.toLowerCase())) {
+            query = `SELECT user_id, username, email, access_level FROM User WHERE access_level = ?`;
+            params = [filter];
+        } else {
+            query = `SELECT user_id, username, email, access_level FROM User WHERE username = ?`;
+            params = [filter];
+        }
+
+        const [users] = await db.execute(query, params);
+
+        if (!users.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'No users found.',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Users retrieved successfully.',
+            users,
+        });
+    } catch (error) {
+        console.error('Error fetching users by filter:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch users.',
+        });
+    }
+});
+
+// delete a user from the database by username, can't delete other admins
+router.delete('/profile/:username', verifyToken, checkRole(['admin']), async (req, res) => {
+    const { username } = req.params; // get the username from the URL parameters
+
+    try {
+        // fetch the details of the user to be deleted
+        const queryGetUser = `SELECT user_id, username, email, access_level FROM User WHERE username = ?`;
+        const [users] = await db.execute(queryGetUser, [username]);
+
+        // check if the user exists
+        if (!users.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found.',
+            });
+        }
+
+        const userToDelete = users[0];
+
+        // check if the user is an admin
+        if (userToDelete.access_level === 'admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'You cannot delete another admin.',
+            });
+        }
+
+        // delete the user
+        const queryDeleteUser = `DELETE FROM User WHERE username = ?`;
+        const [result] = await db.execute(queryDeleteUser, [username]);
+
+        if (result.affectedRows === 0) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to delete user.',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `User '${username}' deleted successfully.`,
+        });
+
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred while deleting the user.',
+        });
+    }
+});
+
 
 module.exports = router;

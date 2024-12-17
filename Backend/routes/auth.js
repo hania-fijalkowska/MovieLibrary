@@ -2,7 +2,8 @@ const express = require('express'); // for creating a web server and handling ro
 const bcrypt = require('bcryptjs'); // for password hashing
 const jwt = require('jsonwebtoken'); // for token generation
 const validator = require('validator'); // for input validation
-
+const verifyToken = require('../middlewares/authMiddleware'); // for token verification
+const checkRole = require('../middlewares/roleMiddleware'); // for role verification
 const db = require('../config/db'); // imports the database connection
 
 require('dotenv').config(); // loads environment variables
@@ -112,5 +113,55 @@ router.post('/login', async (req, res) => {
         res.status(500).json({message: 'Error logging in. :('})
     }
 });
+
+// register a new admin or moderator
+router.post('/register/admin', verifyToken, checkRole(['admin']), async (req, res) => {
+    const { email, username, password, role } = req.body;
+
+    if (!email || !username || !password || !role) {
+        return res.status(400).json({ message: 'Email, username, password, and role are required!' });
+    }
+
+    const allowedRoles = ['admin', 'moderator'];
+    if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ message: 'Invalid role. Allowed roles: admin, moderator.' });
+    }
+
+    if (!validator.isEmail(email)) {
+        return res.status(400).json({ message: 'Invalid email format!' });
+    }
+
+    if (password.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long!' });
+    }
+
+    try {
+        // check if a user with the provided email or username already exists
+        const [existingUser] = await db.execute(
+            'SELECT * FROM User WHERE email = ? OR username = ?',
+            [email, username]
+        );
+
+        if (existingUser.length > 0) {
+            return res.status(409).json({ message: 'Email or username already exists.' });
+        }
+
+        const hashed_password = await bcrypt.hash(password, 10);
+
+        // add the new user (admin/moderator) to the database
+        const query = `
+            INSERT INTO User (email, username, password, access_level)
+            VALUES (?, ?, ?, ?)
+        `;
+        await db.execute(query, [email, username, hashed_password, role]);
+
+        res.status(201).json({ message: `New ${role} registered successfully!` });
+    } catch (error) {
+        console.error('Admin registration error: ', error);
+        res.status(500).json({ message: 'Error registering new admin or moderator.' });
+    }
+});
+
+
 
 module.exports = router;
