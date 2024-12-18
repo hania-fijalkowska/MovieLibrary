@@ -24,12 +24,14 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
     }
 
+    const connection = await db.getConnection(); // get a connection from the pool
     try {
-        await db.beginTransaction(); // start a transaction
+        await connection.beginTransaction(); // start a transaction
 
         // check if movieId exists in the Movie table
-        const [movieCheck] = await db.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
+        const [movieCheck] = await connection.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
         if (!movieCheck.length) {
+            await connection.rollback(); // rollback the transaction if movie not found
             return res.status(404).json({
                 success: false,
                 message: 'Movie not found.'
@@ -37,24 +39,24 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         }
 
         // insert or update score
-        const query = `
+        const scoreQuery = `
             INSERT INTO Score (user_id, movie_id, score)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE score = ?;
         `;
 
-        await db.execute(query, [req.user.user_id, movieId, score, score,]);
+        await connection.execute(scoreQuery, [req.user.user_id, movieId, score, score,]);
 
         // recalculate average rating
         const avgQuery = `
             UPDATE Movie
-            SET rating = COALESCE((SELECT AVG(score) FROM Score WHERE movie_id = ?), 0)
+            SET score = COALESCE((SELECT AVG(score) FROM Score WHERE movie_id = ?), 0)
             WHERE movie_id = ?;
         `;
 
-        await db.execute(avgQuery, [movieId, movieId]);
+        await connection.execute(avgQuery, [movieId, movieId]);
 
-        await db.commit(); // commit transaction
+        await connection.commit(); // commit the transaction
 
         res.status(200).json({
             success: true,
@@ -62,13 +64,14 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
+        await connection.rollback(); // rollback the transaction in case of error
         console.error('Error adding/updating score:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to add/update score.'
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 
@@ -83,12 +86,14 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
     }
 
+    const connection = await db.getConnection(); // get a connection from the pool
     try {
-        await db.beginTransaction(); // start a transaction
-        
+        await connection.beginTransaction(); // start a transaction
+
         // check if movieId exists in the Movie table
-        const [movieCheck] = await db.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
+        const [movieCheck] = await connection.execute('SELECT movie_id FROM Movie WHERE movie_id = ?', [movieId]);
         if (!movieCheck.length) {
+            await connection.rollback(); // rollback the transaction if movie not found
             return res.status(404).json({
                 success: false,
                 message: 'Movie not found.'
@@ -100,7 +105,7 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
             DELETE FROM Score
             WHERE user_id = ? AND movie_id = ?;
         `;
-        const [result] = await db.execute(query, [req.user.user_id, movieId]);
+        const [result] = await connection.execute(query, [req.user.user_id, movieId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -112,13 +117,13 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         // recalculate average rating for the movie
         const avgQuery = `
             UPDATE Movie
-            SET rating = COALESCE((SELECT AVG(score) FROM Score WHERE movie_id = ?), 0)
+            SET score = COALESCE((SELECT AVG(score) FROM Score WHERE movie_id = ?), 0)
             WHERE movie_id = ?;
         `;
 
-        await db.execute(avgQuery, [movieId, movieId]);
+        await connection.execute(avgQuery, [movieId, movieId]);
 
-        await db.commit(); // commit transaction
+        await connection.commit(); // commit the transaction
 
         res.status(200).json({
             success: true,
@@ -126,8 +131,7 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
+        await connection.rollback(); // rollback the transaction in case of error
         console.error('Error deleting score:', error);
         res.status(500).json({
             success: false,

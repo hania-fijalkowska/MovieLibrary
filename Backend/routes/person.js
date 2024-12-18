@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/:personId', async (req, res) => {
     const { personId } = req.params;
 
-    if (!movieId || isNaN(movieId)) {
+    if (!personId || isNaN(personId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid person ID.'
@@ -58,7 +58,9 @@ router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
             INSERT INTO Person (first_name, last_name, gender, birth_year, birth_country)
             VALUES (?, ?, ?, ?, ?);
         `;
+
         await db.execute(query, [firstName, lastName, gender, birthYear, birthCountry]);
+        
         res.status(200).json({
             success: true,
             message: 'Person added successfully!'

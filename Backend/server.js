@@ -22,11 +22,11 @@ app.use(cors()); // enables CORS
 app.use(express.json()); // parses JSON request bodies
 
 // routes
-app.use('/api/v1', authRoutes);,
+app.use('/api/v1', authRoutes);
 app.use('/api/v1/cast', castRoutes);
 app.use('/api/v1/director', directorRoutes);
 app.use('/api/v1/genre', genreRoutes);
-//app.use('/api/v1/movie', movieRoutes);
+app.use('/api/v1/movie', movieRoutes);
 app.use('/api/v1/person', personRoutes);
 app.use('/api/v1/review', reviewRoutes);
 app.use('/api/v1/score', scoreRoutes);

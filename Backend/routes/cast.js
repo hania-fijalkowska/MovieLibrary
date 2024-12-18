@@ -9,7 +9,6 @@ const router = express.Router();
 // get all cast members for a movie
 router.get('/movie/:movieId/cast', async (req, res) => {
     const { movieId } = req.params;
-    const { limit, offset } = getPaginationParams(req);
 
     if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
@@ -24,9 +23,8 @@ router.get('/movie/:movieId/cast', async (req, res) => {
             FROM Cast c
             JOIN Person p ON c.person_id = p.person_id
             WHERE c.movie_id = ?
-            LIMIT ? OFFSET ?
         `;
-        const [rows] = await db.execute(query, [movieId, limit, offset]);
+        const [rows] = await db.execute(query, [movieId]);
 
         if (rows.length === 0) {
             return res.status(404).json({
@@ -53,7 +51,6 @@ router.get('/movie/:movieId/cast', async (req, res) => {
 // get all movies a person has been cast in
 router.get('/person/:personId/movies', async (req, res) => {
     const { personId } = req.params; // sprawdzic personId
-    const { limit, offset } = getPaginationParams(req);
 
     if (!personId || isNaN(personId)) {
         return res.status(400).json({
@@ -68,10 +65,9 @@ router.get('/person/:personId/movies', async (req, res) => {
             FROM Movie m
             JOIN Cast c ON m.movie_id = c.movie_id
             WHERE c.person_id = ?
-            LIMIT ? OFFSET ?
         `;
 
-        const [rows] = await db.execute(query, [personId, limit, offset]);
+        const [rows] = await db.execute(query, [personId]);
 
         if (rows.length === 0) {
             return res.status(404).json({
@@ -119,15 +115,11 @@ router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
     }
 
     try {
-        await db.beginTransaction(); // start a transaction
-
         const query = `
             INSERT INTO Cast (movie_id, person_id, cast_name)
             VALUES (?, ?, ?)
         `;
         await db.execute(query, [movieId, personId, castName]);
-
-        await db.commit(); // commit transaction
 
         res.status(200).json({
             success: true,
@@ -135,7 +127,6 @@ router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
         console.error('Error adding cast member for a movie: ', error);
         res.status(500).json({
             success: false,
@@ -170,8 +161,6 @@ router.put('/edit', verifyToken, checkRole('moderator'), async (req, res) => {
     }
 
     try {
-        await db.beginTransaction(); // start a transaction
-
         const query = `
             UPDATE Cast
             SET cast_name = ?
@@ -186,16 +175,12 @@ router.put('/edit', verifyToken, checkRole('moderator'), async (req, res) => {
             });
         }
 
-        await db.commit(); // commit transaction
-
         res.status(200).json({
             success: true,
             message: 'Cast member cast name updated successfully!'
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
         console.error('Error editing cast name for a cast member: ', error);
         res.status(500).json({
             success: false,
@@ -223,7 +208,6 @@ router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) =
     }
 
     try {
-        await db.beginTransaction(); // start a transaction
         const query = `
             DELETE FROM Cast
             WHERE movie_id = ? AND person_id = ?
@@ -237,12 +221,8 @@ router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) =
             });
         }
 
-        await db.commit(); // commit transaction
-
         res.status(200).json({ message: 'Cast member removed from movie successfully!' });
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
         console.error('Error deleting cast member from a movie: ', error);
         res.status(500).json({
             success: false,

@@ -5,29 +5,26 @@ const validator = require('validator'); // for input validation
 const verifyToken = require('../middlewares/authMiddleware'); // for token verification
 const checkRole = require('../middlewares/roleMiddleware'); // for role verification
 const db = require('../config/db'); // imports the database connection
+const generateToken = require('../utils/generateToken');
+const { verifyAndBlacklistToken } = require('../middlewares/blacklistMiddleware');
 
 require('dotenv').config(); // loads environment variables
 
 const router = express.Router();
 
-// helper function to generate JWT token
-const generateToken = (user) => {
-    if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET is not defined in the environment variables!');
-    }
-    return jwt.sign(
-        { user_id: user.user_id, username: user.username, access_level: user.access_level },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-    );
-};
-
 // user registration route
 router.post('/register', async (req, res) => { // defines POST route at /api/register
     const {email, username, password} = req.body; // extracts email, username, password from the request body
 
+    const restrictedUsernames = ['admin', 'moderator', 'user']; // restricted usernames
+
     if (!email || !username || !password){
         return res.status(400).json({message: 'Email, username and password are required!'});
+    }
+
+    // check if the username is in the restricted list
+    if (restrictedUsernames.includes(username.toLowerCase())) {
+        return res.status(400).json({ message: 'Username cannot be "admin", "moderator", or "user".' });
     }
 
     if (!validator.isEmail(email)) {
@@ -80,11 +77,17 @@ router.post('/login', async (req, res) => {
     const {email, password} = req.body;
 
     if(! email || !password){
-        return res.status(400).json({message: 'Email and password are required!'});
+        return res.status(400).json({
+            success: false,
+            message: 'Email and password are required!'
+        });
     }
 
     if (!validator.isEmail(email)) {
-        return res.status(400).json({ message: 'Invalid email format!' });
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format!'
+        });
     }
 
     try {
@@ -92,7 +95,10 @@ router.post('/login', async (req, res) => {
         const[rows] = await db.execute(query, [email]);
 
         if (rows.length === 0){
-            return res.status(401).json({message: 'Invalid email!'});
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email!'
+            });
         }
 
         const user = rows[0];
@@ -100,26 +106,46 @@ router.post('/login', async (req, res) => {
         // compare passwords
         const doesPasswordMatch = await bcrypt.compare(password, user.password);
         if (!doesPasswordMatch){
-            return res.status(401).json({message: 'Invalid password!'});
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid password!'
+            });
         }
 
         const token = generateToken(user);
 
-        res.status(200).json({message: 'Login successful! :)', token});
+        res.status(200).json({
+            success: true,
+            message: 'Login successful! :)', token
+        });
 
     }
     catch (error) {
         console.error('Login error: ', error);
-        res.status(500).json({message: 'Error logging in. :('})
+        res.status(500).json({
+            success: false,
+            message: 'Error logging in. :('
+        })
     }
+});
+
+router.post('/logout', verifyAndBlacklistToken, (req, res) => {
+    res.status(200).json({ success: true, message: 'Logged out successfully.' });
 });
 
 // register a new admin or moderator
 router.post('/register/admin', verifyToken, checkRole(['admin']), async (req, res) => {
     const { email, username, password, role } = req.body;
 
+    const restrictedUsernames = ['admin', 'moderator', 'user']; // restricted usernames
+
     if (!email || !username || !password || !role) {
         return res.status(400).json({ message: 'Email, username, password, and role are required!' });
+    }
+
+    // check if the username is in the restricted list
+    if (restrictedUsernames.includes(username.toLowerCase())) {
+        return res.status(400).json({ message: 'Username cannot be "admin", "moderator", or "user".' });
     }
 
     const allowedRoles = ['admin', 'moderator'];
@@ -161,7 +187,5 @@ router.post('/register/admin', verifyToken, checkRole(['admin']), async (req, re
         res.status(500).json({ message: 'Error registering new admin or moderator.' });
     }
 });
-
-
 
 module.exports = router;

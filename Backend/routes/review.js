@@ -5,7 +5,6 @@ const db = require('../config/db');
 
 const router = express.Router();
 
-
 // add or update review for a movie
 router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
     const movieId = Number(req.params.movieId);
@@ -24,7 +23,6 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
             message: 'Review cannot be empty.'
         });
     }
-
     
     const reviewWords = review.trim().split(/\s+/); // split by whitespace
     if (reviewWords.length > 200) {
@@ -33,12 +31,14 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
             message: 'Review must be less than or equal to 200 words.'
         });
     }
-    
 
+    const connection = await db.getConnection();
     try {
-        // ensure movieId exists
-        const [movieExists] = await db.execute('SELECT 1 FROM Movie WHERE movie_id = ?', [movieId]);
+        await connection.beginTransaction();
+
+        const [movieExists] = await connection.execute('SELECT 1 FROM Movie WHERE movie_id = ?', [movieId]);
         if (!movieExists.length) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Movie not found.',
@@ -52,7 +52,17 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
             ON DUPLICATE KEY UPDATE review = ?;
         `;
 
-        await db.execute(query, [req.user.user_id, movieId, review, review,]);
+        const [result] = await connection.execute(query, [req.user.user_id, movieId, review, review,]);
+
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'No movie updated.'
+            });
+        }
+
+        await connection.commit();
 
         res.status(200).json({
             success: true,
@@ -60,11 +70,14 @@ router.post('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
 
     } catch (error) {
+        await connection.rollback();
         console.error('Error adding/updating review:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to add/update review.'
         });
+    } finally {
+        connection.release();
     }
 });
 
@@ -80,11 +93,13 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
     }
 
+    const connection = await db.getConnection();
     try {
+        await connection.beginTransaction();
+        const [movieExists] = await connection.execute('SELECT 1 FROM Movie WHERE movie_id = ?', [movieId]);
 
-        // Ensure movieId exists
-        const [movieExists] = await db.execute('SELECT 1 FROM Movie WHERE movie_id = ?', [movieId]);
         if (!movieExists.length) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Movie not found.',
@@ -96,14 +111,17 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
             DELETE FROM Review
             WHERE user_id = ? AND movie_id = ?;
         `;
-        const [result] = await db.execute(query, [req.user.user_id, movieId]);
+        const [result] = await connection.execute(query, [req.user.user_id, movieId]);
 
         if (result.affectedRows === 0) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'No review found to delete.'
             });
         }
+
+        await connection.commit();
 
         res.status(200).json({
             success: true,
@@ -111,11 +129,14 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
         });
 
     } catch (error) {
+        await connection.rollback();
         console.error('Error deleting review:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to delete review.'
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 

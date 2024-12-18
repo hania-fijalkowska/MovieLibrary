@@ -3,8 +3,7 @@ const verifyToken = require('../middlewares/authMiddleware'); // import the midd
 const checkRole = require('../middlewares/roleMiddleware');
 const getPaginationParams = require('../utils/pagination');
 const bcrypt = require('bcryptjs'); // for password hashing
-// const validator = require('validator'); // for email vaildation
-const checkRole = require('../middlewares/roleMiddleware'); // Import middleware do sprawdzania roli użytkownika
+const validator = require('validator'); // for email vaildation
 
 
 const router = express.Router();
@@ -39,16 +38,16 @@ router.get('/profile', verifyToken, async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'User profile: ',
+            message: 'Profile: ',
             data: rows[0]
         });
 
     } catch (error) {
-        console.error('Error fetching user profile: ', error);
+        console.error('Error fetching profile: ', error);
 
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch user profile.'
+            message: 'Failed to fetch profile.'
         });
     }
 });
@@ -97,6 +96,23 @@ router.put('/profile', verifyToken, async (req, res) => {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid password!'
+            });
+        }
+
+        // check if the new password is the same as the current password
+        const doesNewPasswordMatchCurrent = await bcrypt.compare(newPassword, user[0].password);
+        if (doesNewPasswordMatchCurrent) {
+            return res.status(400).json({
+                success: false,
+                message: 'New password cannot be the same as the current password.',
+            });
+        }
+
+        // check if the new username is the same as the current username
+        if (newUsername === user[0].username) {
+            return res.status(400).json({
+                success: false,
+                message: 'New username cannot be the same as the current username.',
             });
         }
 
@@ -158,14 +174,14 @@ router.delete('/profile', verifyToken, async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'User profile deleted successfully.',
+            message: 'Profile deleted successfully.',
         });
 
     } catch (error) {
         console.error('Error deleting profile:',error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete user profile.',
+            message: 'Failed to delete profile.',
         });
     }
 });
@@ -173,7 +189,6 @@ router.delete('/profile', verifyToken, async (req, res) => {
 // get user reviews and scores (with pagination)
 router.get('/ratings', verifyToken,  checkRole('user'), async (req, res) => {
     const userId = Number(req.user.user_id); // extract user ID from token
-    const { limit, offset } = getPaginationParams(req);
 
     if (!userId || isNaN(userId)) {
         return res.status(400).json({
@@ -184,23 +199,18 @@ router.get('/ratings', verifyToken,  checkRole('user'), async (req, res) => {
 
     try {
         const query = `
-            SELECT r.movie_id, s.score, r.review, m.title 
-            FROM Review r
-            JOIN Score s ON r.movie_id = s.movie_id AND r.user_id = s.user_id
-            JOIN Movie m ON r.movie_id = m.movie_id
-            WHERE r.user_id = ?
-            LIMIT ? OFFSET ?
+            SELECT m.movie_id, m.title, s.score, r.review
+            FROM Movie m
+            LEFT JOIN Score s ON m.movie_id = s.movie_id AND s.user_id = ?
+            LEFT JOIN Review r ON m.movie_id = r.movie_id AND r.user_id = ?
+            WHERE s.user_id = ? OR r.user_id = ?
         `;
 
-        const [rows] = await db.execute(query, [userId, limit, offset]);
+        const [rows] = await db.execute(query, [userId, userId, userId, userId]);
 
         res.status(200).json({
             success: true,
             data: rows,
-            pagination: {
-                page: page,
-                limit: limit,
-            }
         });
 
     } catch (error) {

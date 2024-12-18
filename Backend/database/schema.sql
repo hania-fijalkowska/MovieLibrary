@@ -27,7 +27,7 @@ CREATE TABLE User(
     email VARCHAR(50) NOT NULL UNIQUE,
     username VARCHAR(20) NOT NULL UNIQUE,
     password VARCHAR(200) NOT NULL,
-    access_level ENUM('user', 'moderator', 'admin') DEFAULT 'user'
+    access_level ENUM('user', 'moderator', 'admin') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -36,7 +36,7 @@ CREATE TABLE Score (
     movie_id INT NOT NULL,
     user_id INT NOT NULL,
 
-    score DECIMAL(2, 1) NOT NULL,
+    score DECIMAL(3, 1) NOT NULL,
 
     PRIMARY KEY (user_id, movie_id),
     FOREIGN KEY (movie_id) REFERENCES Movie(movie_id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -74,10 +74,10 @@ CREATE TABLE Movie_Genre(
 
     PRIMARY KEY (movie_id, genre_id),
     FOREIGN KEY (movie_id) REFERENCES Movie(movie_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (genre_id) REFERENCES Genre(genre_id) ON DELETE RESTRICT ON UPDATE CASCADE
+    FOREIGN KEY (genre_id) REFERENCES Genre(genre_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE Cast(
+CREATE TABLE Movie_Cast(
     cast_id INT AUTO_INCREMENT PRIMARY KEY,
 
     person_id INT NOT NULL,

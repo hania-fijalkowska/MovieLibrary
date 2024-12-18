@@ -17,6 +17,17 @@ router.get('/movie/:movieId', async (req, res) => {
     }
 
     try {
+        // check if the movie has directors
+        const movieCheckQuery = `SELECT 1 FROM Director WHERE movie_id = ? LIMIT 1`;
+        const [movieCheck] = await db.execute(movieCheckQuery, [movieId]);
+
+        if (movieCheck.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No directors found for this movie.'
+            });
+        }
+        
         const query = `
             SELECT p.person_id, p.first_name, p.last_name, p.gender, p.birth_year, p.birth_country 
             FROM Director d
@@ -59,8 +70,18 @@ router.get('/person/:personId', async (req, res) => {
     }
 
     try {
+        const directorCheckQuery = `SELECT 1 FROM Director WHERE person_id = ? LIMIT 1`;
+        const [directorCheck] = await db.execute(directorCheckQuery, [personId]);
+
+        if (directorCheck.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Director not found.'
+            });
+        }
+
         const query = `
-            SELECT m.movie_id, m.title, m.synopsis, m.rating 
+            SELECT m.movie_id, m.title, m.synopsis, m.score
             FROM Director d
             JOIN Movie m ON d.movie_id = m.movie_id
             WHERE d.person_id = ?;
@@ -68,10 +89,18 @@ router.get('/person/:personId', async (req, res) => {
         const [rows] = await db.execute(query, [personId]);
 
         if (rows.length === 0) {
-            return res.status(404).json({ message: 'No movies found for this director.' });
+            return res.status(404).json({
+                success: false,
+                message: 'No movies found for this director.'
+            });
         }
 
-        res.status(200).json(rows);
+        res.status(200).json({
+            success: true,
+            message: "Movies: ",
+            data: rows,
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to fetch movies for the director.' });

@@ -8,11 +8,9 @@ const router = express.Router();
 
 // get all genres in the database
 router.get('/', async (req, res) => {
-    const { limit, offset } = getPaginationParams(req);
-
     try {
-        const query = `SELECT genre_name FROM Genre LIMIT ? OFFSET ?`;
-        const [rows] = await db.execute(query, [limit, offset]);
+        const query = `SELECT genre_name FROM Genre`;
+        const [rows] = await db.execute(query);
 
         if (!rows.length) {
             return res.status(404).json({
@@ -39,7 +37,6 @@ router.get('/', async (req, res) => {
 // get all genres for a movie
 router.get('/:movieId', async (req, res) => {
     const movieId = Number(req.params.movieId);
-    const { limit, offset } = getPaginationParams(req);
 
     if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
@@ -53,10 +50,10 @@ router.get('/:movieId', async (req, res) => {
         SELECT g.genre_name
         FROM Genre g
         JOIN Movie_Genre mg ON g.genre_id = mg.genre_id 
-        WHERE mg.movie_id = ? LIMIT ? OFFSET ?
+        WHERE mg.movie_id = ?
         `;
 
-        const [rows] = await db.execute(query, [movieId, limit, offset]);
+        const [rows] = await db.execute(query, [movieId]);
 
         if (!rows.length) {
             return res.status(404).json({
@@ -80,23 +77,28 @@ router.get('/:movieId', async (req, res) => {
     }
 });
 
-// get all movies for a specific genre
-router.get('/movies/:genre', async (req, res) => {
-    const { genre } = req.params;
+// get all movies for a genre
+router.get('/movies/:genreId', async (req, res) => {
+    const genreId = Number(req.params.genreId);
 
-    const { limit, offset } = getPaginationParams(req);
+    if (!genreId || isNaN(genreId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid genre ID.'
+        });
+    }
 
     try {
         const query = `
-            SELECT m.movie_id, m.title, m.synopsis, m.score
+            SELECT m.title, m.score
             FROM Movie m
             JOIN Movie_Genre mg ON m.movie_id = mg.movie_id
             JOIN Genre g ON mg.genre_id = g.genre_id
-            WHERE g.genre_name = ? LIMIT ? OFFSET ?;
+            WHERE g.genre_id = ?
         `;
-        const [rows] = await db.execute(query, [genre, limit, offset]);
+        const [rows] = await db.execute(query, [genreId]);
 
-        if (!rows.length) {
+        if (rows.length === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'No movies found for the specified genre.'
@@ -119,9 +121,119 @@ router.get('/movies/:genre', async (req, res) => {
     }
 });
 
+// add a new genre (moderators only)
+router.post('/add-genre', verifyToken, checkRole('moderator'), async (req,res) => {
+    const {genreName} = req.body;
+
+    if (!genreName || genreName.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            message: 'Genre name is required.'
+        });
+    }
+
+    const connection = await db.getConnection();
+    try{
+        await connection.beginTransaction();
+
+        const [existingGenre] = await connection.execute(
+            'SELECT * FROM Genre WHERE genre_name = ?',
+            [genreName.trim()]
+        );
+
+        if (existingGenre.length > 0) {
+            await connection.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Genre already exists.'
+            });
+        }
+        
+        const query = `
+            INSERT INTO Genre (genre_name)
+            VALUES (?)
+        `;
+
+        await connection.execute(query, [genreName.trim()]);
+
+        await connection.commit();
+
+        res.status(201).json({
+            success: true,
+            message: 'Genre added successfully!'
+        });
+
+    } catch {
+        await connection.rollback();
+        console.error('Error adding new genre', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to add new genre.'
+        });
+    } finally {
+        connection.release(); // release the connection back to the pool
+    }
+});
+
+// delete a genre from Genre table (moderators only)
+router.delete('/delete-genre', verifyToken, checkRole('moderator'), async (req, res) => {
+    const { genreId } = req.body;
+
+    // Validate input genreId
+    if (!genreId || isNaN(genreId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid genre ID.'
+        });
+    }
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        const genreQuery = `SELECT * FROM Genre WHERE genre_id = ?`;
+        const [genreResult] = await connection.execute(genreQuery, [genreId]);
+
+        if (!genreResult.length) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Genre not found.'
+            });
+        }
+
+        const deleteQuery = `DELETE FROM Genre WHERE genre_id = ?`;
+        const [deleteResult] = await connection.execute(deleteQuery, [genreId]);
+
+        if (deleteResult.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Failed to delete genre.'
+            });
+        }
+
+        await connection.commit();
+
+        res.status(200).json({
+            success: true,
+            message: 'Genre deleted successfully!'
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error deleting genre from Genre table:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete genre.'
+        });
+    } finally {
+        connection.release(); // release the connection back to the pool
+    }
+});
+
 // add a genre to a movie (moderators only)
 router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
-    const { movieId, genre } = req.body;
+    const { movieId, genreId } = req.body;
 
     if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
@@ -130,59 +242,86 @@ router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
         });
     }
     
-    if (!genre) {
+    if (!genreId || isNaN(genreId)) {
         return res.status(400).json({
             success: false,
-            message: 'Genre is required.'
+            message: 'Invalid genre ID.'
         });
     }
 
+    const connection = await db.getConnection();
     try {
-        await db.beginTransaction(); // start a transaction
+        await connection.beginTransaction();
+        const [movieExists] = await connection.execute('SELECT * FROM Movie WHERE movie_id = ?', [movieId]);
 
-        const getGenreIdQuery = `
-        SELECT genre_id FROM Genre WHERE genre_name = ?
-        `;
+        if (!movieExists.length) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Movie not found.'
+            });
+        }
 
+        const [genreExists] = await connection.execute('SELECT * FROM Genre WHERE genre_id = ?', [genreId]);
 
-
-        const [ genres ] = await db.execute(getGenreIdQuery, [genre]);
-
-        if(!genres.length){
+        if (!genreExists.length) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Genre not found.'
             });
         }
 
-        const genreId = genres[0].genre_id;
+        // check if the genre is already associated with the movie
+        const [existingAssociation] = await connection.execute(
+            'SELECT * FROM Movie_Genre WHERE movie_id = ? AND genre_id = ?',
+            [movieId, genreId]
+        );
 
-        const insertMovieGenreQuery = `
+        if (existingAssociation.length > 0) {
+            await connection.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'This genre is already associated with the movie.'
+            });
+        }
+
+        const insertQuery = `
             INSERT INTO Movie_Genre (movie_id, genre_id) VALUES (?, ?)
         `;
 
-        await db.execute(insertMovieGenreQuery, [movieId, genreId]);
-        await db.commit(); // commit transaction
+        const [result] = await connection.execute(insertQuery, [movieId, genreId]);
+
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'No movie updated.'
+            });
+        }
+
+        await connection.commit();
 
         res.status(200).json({
             success: true,
-            message: 'Genre added to movie successfully!'
+            message: 'Genre added to movie successfully.'
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
-        console.error('Error adding a movie: ', error);
+        await connection.rollback();
+        console.error('Error adding genre to a movie: ', error);
         res.status(500).json({
             success: false,
             message: 'Failed to add genre to movie.'
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 
 // update movie genre
 router.put('/update', verifyToken, checkRole('moderator'), async (req, res) => {
-    const { movieId, oldGenre, newGenre } = req.body;
+    const { movieId, oldGenreId, newGenreId } = req.body;
 
     if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
@@ -191,31 +330,40 @@ router.put('/update', verifyToken, checkRole('moderator'), async (req, res) => {
         });
     }
 
-    if (!oldGenre || !newGenre) {
+    if (!oldGenreId || isNaN(oldGenreId)) {
         return res.status(400).json({
             success: false,
-            message: 'Old genre and new genre are required.'
+            message: 'Invalid old genre ID.'
         });
     }
 
+    if (!newGenreId || isNaN(newGenreId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid new genre ID.'
+        });
+    }
+
+    if (oldGenreId === newGenreId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Old genre and new genre IDs cannot be the same.'
+        });
+    }
+
+    const connection = await db.getConnection();
     try {
-        await db.beginTransaction(); // start a transaction
+        await connection.beginTransaction();
+        const movieGenreQuery = `SELECT * FROM Movie_Genre WHERE movie_id = ? AND genre_id = ?`;
+        const [movieGenreResult] = await connection.execute(movieGenreQuery, [movieId, oldGenreId]);
 
-        const getOldGenreId = `SELECT genre_id FROM Genre WHERE genre_name = ?`;
-        const getNewGenreId = `SELECT genre_id FROM Genre WHERE genre_name = ?`;
-
-        const [oldGenreResult] = await db.execute(getOldGenreId, [oldGenre]);
-        const [newGenreResult] = await db.execute(getNewGenreId, [newGenre]);
-
-        if (!oldGenreResult.length || !newGenreResult.length) {
+        if (!movieGenreResult.length) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
-                message: 'Invalid old or new genre name.',
+                message: 'Movie-Genre association not found.',
             });
         }
-
-        const oldGenreId = oldGenreResult[0].genre_id;
-        const newGenreId = newGenreResult[0].genre_id;
 
         const updateGenreQuery = `
         UPDATE Movie_Genre
@@ -223,16 +371,17 @@ router.put('/update', verifyToken, checkRole('moderator'), async (req, res) => {
         WHERE movie_id = ? AND genre_id = ?
         `;
 
-        const [result] = await db.execute(updateGenreQuery, [newGenreId, movieId, oldGenreId]);
+        const [result] = await connection.execute(updateGenreQuery, [newGenreId, movieId, oldGenreId]);
 
         if (result.affectedRows === 0) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
-                message: 'Genre not found for the specified movie.',
+                message: 'Failed to update genre for a movie',
             });
         }
 
-        await db.commit(); // commit transaction
+        await connection.commit();
 
         res.status(200).json({
             success: true,
@@ -240,19 +389,20 @@ router.put('/update', verifyToken, checkRole('moderator'), async (req, res) => {
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
+        await connection.rollback();
         console.error('Error updating movie genre: ', error);
         res.status(500).json({
             success: false,
             message: 'Failed to update genre.'
         });
+    } finally {
+        connection.release();
     }
 });
 
 // delete a genre from a movie (moderators only)
 router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) => {
-    const { movieId, genre } = req.body;
+    const { movieId, genreId } = req.body;
 
     if (!movieId || isNaN(movieId)) {
         return res.status(400).json({
@@ -261,41 +411,40 @@ router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) =
         });
     }
 
-    if (!genre) {
+    if (!genreId || isNaN(genreId)) {
         return res.status(400).json({
             success: false,
-            message: 'Genre is required.'
+            message: 'Invalid genre ID.'
         });
     }
 
+    const connection = await db.getConnection();
     try {
-        await db.beginTransaction(); // start a transaction
+        await connection.beginTransaction();
+        const movieGenreQuery = `SELECT * FROM Movie_Genre WHERE genre_id = ? AND movie_id = ?`;
+        const [movieGenreResult] = await connection.execute(movieGenreQuery, [genreId, movieId]);
 
-        // resolve genre_id from genre_name
-        const genreQuery = `SELECT genre_id FROM Genre WHERE genre_name = ?`;
-        const [genreResult] = await db.execute(genreQuery, [genre]);
-
-        if (!genreResult.length) {
+        if (!movieGenreResult.length) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
-                message: 'Genre not found.',
+                message: 'Movie-Genre association not found.',
             });
         }
 
-        const genreId = genreResult[0].genre_id;
-
-        // Delete the genre association from Movie_Genre
+        // delete the genre association from Movie_Genre
         const deleteQuery = `DELETE FROM Movie_Genre WHERE movie_id = ? AND genre_id = ?`;
-        const [deleteResult] = await db.execute(deleteQuery, [movieId, genreId]);
+        const [deleteResult] = await connection.execute(deleteQuery, [movieId, genreId]);
 
         if (deleteResult.affectedRows === 0) {
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
-                message: 'Genre not associated with the specified movie.',
+                message: 'Failed to remove genre from a movie.',
             });
         }
 
-        await db.commit(); // commit transaction
+        await connection.commit();
 
         res.status(200).json({
             success: true,
@@ -303,13 +452,14 @@ router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) =
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction on error
-
+        await connection.rollback();
         console.error('Error deleting genre from movie:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to remove genre from movie.',
+            message: 'Failed to delete genre from movie.',
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 

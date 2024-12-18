@@ -6,16 +6,11 @@ const db = require('../config/db');
 
 const router = express.Router();
 
-
-
 // get all movies
 router.get('/', async (req, res) => {
-    const { limit, offset, page } = getPaginationParams(req);
-
     try {
-        const query = `SELECT * FROM Movie LIMIT ? OFFSET ?`; // NIE DZIALA LIMIT OFFSET - niepoprawne argumenty, może byc blad wersji mysql
-        const [movies] = await db.execute(query, [limit, offset]);
-
+        const query = `SELECT * FROM Movie`;
+        const [movies] = await db.execute(query);
 
         if (!movies.length) {
             return res.status(404).json({
@@ -27,11 +22,7 @@ router.get('/', async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Movies retrieved successfully.",
-            movies,
-            pagination: {
-                page: page,
-                limit: limit,
-            }
+            movies
         });
 
     } catch (error) {
@@ -81,6 +72,42 @@ router.get('/title/:title', async (req, res) => {
     }
 });
 
+// get all ratings and scores for a specific movie
+router.get('/ratings/:movieId', async (req, res) => {
+    const movieId = Number(req.params.movieId);
+
+    if (!movieId || isNaN(movieId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid movie ID.'
+        });
+    }
+
+    try {
+        const query = `
+            SELECT u.username, s.score, r.review
+            FROM Movie m
+            LEFT JOIN Score s ON m.movie_id = s.movie_id
+            LEFT JOIN Review r ON m.movie_id = r.movie_id AND r.user_id = s.user_id
+            LEFT JOIN User u ON u.user_id = s.user_id OR u.user_id = r.user_id
+            WHERE m.movie_id = ?
+        `;
+
+        const [rows] = await db.execute(query, [movieId]);
+
+        res.status(200).json({
+            success: true,
+            data: rows,
+        });
+
+    } catch (error) {
+        console.error('Error fetching movie ratings and reviews:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch ratings and reviews.',
+        });
+    }
+});
 
 // add a new movie (moderators only)
 router.post('/', verifyToken, checkRole('moderator'), async (req, res) => {
@@ -105,17 +132,25 @@ router.post('/', verifyToken, checkRole('moderator'), async (req, res) => {
         validEpisodes = episodes;
     }
 
+    const connection = await db.getConnection();
     try {
-        await db.beginTransaction(); // start a transaction
-
+        await connection.beginTransaction();
         const query = `
             INSERT INTO Movie (title, episodes, synopsis)
             VALUES (?, ?, ?)
         `;
 
-        await db.execute(query, [title, validEpisodes, synopsis || null]);
+        const [result] = await connection.execute(query, [title, validEpisodes, synopsis || null]);
 
-        await db.commit(); // commit transaction
+        if (result.affectedRows === 0) {
+            await connection.rollback(); // rollback if no rows were affected
+            return res.status(404).json({
+                success: false,
+                message: 'No movie updated.'
+            });
+        }
+
+        await connection.commit();
 
         res.status(201).json({
             success: true,
@@ -123,13 +158,14 @@ router.post('/', verifyToken, checkRole('moderator'), async (req, res) => {
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
+        await connection.rollback();
         console.error('Error adding a new movie:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to add movie.' 
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 
@@ -163,14 +199,13 @@ router.put('/:movieId', verifyToken, checkRole('moderator'), async (req, res) =>
         validEpisodes = newEpisodes;
     }
 
-
+    const connection = await db.getConnection(); // get a connection from the pool
     try {
-        await db.beginTransaction(); // start a transaction
-
-        const [existingMovie] = await db.execute('SELECT * FROM Movie WHERE movie_id = ?', [movieId]);
+        await connection.beginTransaction(); // start a transaction
+        const [existingMovie] = await connection.execute('SELECT * FROM Movie WHERE movie_id = ?', [movieId]);
 
         if (!existingMovie.length) {
-            await db.rollback();
+            await connection.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Movie not found.'
@@ -183,9 +218,17 @@ router.put('/:movieId', verifyToken, checkRole('moderator'), async (req, res) =>
             WHERE movie_id = ?
         `;
 
-        await db.execute(query, [newTitle, validEpisodes, newSynopsis, movieId]);
+        const [result] = await connection.execute(query, [newTitle, validEpisodes, newSynopsis || null, movieId]);
 
-        await db.commit(); // commit transaction
+        if (result.affectedRows === 0) {
+            await connection.rollback(); // rollback if no rows were affected
+            return res.status(404).json({
+                success: false,
+                message: 'No movie updated.'
+            });
+        }
+
+        await connection.commit(); // commit the transaction
 
         res.status(200).json({
             success: true,
@@ -193,13 +236,14 @@ router.put('/:movieId', verifyToken, checkRole('moderator'), async (req, res) =>
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
+        await connection.rollback(); // rollback the transaction in case of error
         console.error('Error updating a movie:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to update movie.'
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 
@@ -214,13 +258,13 @@ router.delete('/:movieId', verifyToken, checkRole('moderator'), async (req, res)
         });
     }
 
+    const connection = await db.getConnection(); // get a connection from the pool
     try {
-        await db.beginTransaction(); // start a transaction
-
-        const [existingMovie] = await db.execute('SELECT * FROM Movie WHERE movie_id = ?', [movieId]);
+        await connection.beginTransaction(); // start a transaction
+        const [existingMovie] = await connection.execute('SELECT * FROM Movie WHERE movie_id = ?', [movieId]);
 
         if (!existingMovie.length) {
-            await db.rollback();
+            await connection.rollback(); // rollback the transaction if movie not found
             return res.status(404).json({
                 success: false,
                 message: 'Movie not found.' });
@@ -230,9 +274,17 @@ router.delete('/:movieId', verifyToken, checkRole('moderator'), async (req, res)
             DELETE FROM Movie WHERE movie_id = ?
         `;
 
-        await db.execute(query, [movieId]);
-        
-        await db.commit(); // commit transaction
+        const [result] = await connection.execute(query, [movieId]);
+
+        if (result.affectedRows === 0) {
+            await connection.rollback(); // rollback if no rows were affected
+            return res.status(404).json({
+                success: false,
+                message: 'No movie deleted'
+            });
+        }
+
+        await connection.commit(); // commit the transaction
 
         res.status(200).json({
             success: true,
@@ -240,13 +292,14 @@ router.delete('/:movieId', verifyToken, checkRole('moderator'), async (req, res)
         });
 
     } catch (error) {
-        await db.rollback(); // rollback transaction in case of error
-
+        await connection.rollback(); // rollback the transaction in case of error
         console.error('Error deleting a movie:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to delete movie.'
         });
+    } finally {
+        connection.release(); // release the connection back to the pool
     }
 });
 
