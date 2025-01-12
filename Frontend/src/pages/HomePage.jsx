@@ -5,60 +5,63 @@ import BackToHomeButton from "../components/BackToHomeButton.jsx";
 
 function HomePage() {
     const navigate = useNavigate();
-    const [movies, setMovies] = useState([]); // Stan do przechowywania filmów
-    const [loading, setLoading] = useState(true); // Stan ładowania
-    const [error, setError] = useState(null); // Stan błędu
-    const [loggedInEmail, setLoggedInEmail] = useState(null); // Stan dla e-maila po zalogowaniu
-    const [role, setRole] = useState(null); // Stan dla roli użytkownika
+    const [movies, setMovies] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [loggedInEmail, setLoggedInEmail] = useState(null);
+    const [role, setRole] = useState(null);
+    const [searchTitle, setSearchTitle] = useState(""); // Stan dla paska wyszukiwania
 
-    // Sprawdzamy, czy użytkownik jest zalogowany przy pierwszym renderze lub po wylogowaniu
     useEffect(() => {
         const token = localStorage.getItem("userToken");
         const savedEmail = localStorage.getItem("userEmail");
         const savedRole = localStorage.getItem("userRole");
 
-        console.log(savedEmail, savedRole, token);
         if (token && savedEmail && savedRole) {
-            console.log(savedEmail);
-            setLoggedInEmail(savedEmail); // Ustawiamy e-mail użytkownika
-            setRole(savedRole); // Ustawiamy rolę użytkownika
+            setLoggedInEmail(savedEmail);
+            setRole(savedRole);
         } else {
             setLoggedInEmail(null);
             setRole(null);
         }
-    }, []); // Efekt odpala się raz, przy pierwszym renderze
+    }, []);
 
     const handleClick = () => {
         navigate('/SignUp');
     };
 
     const handleLogout = () => {
-        // Usuwamy dane z localStorage przy wylogowywaniu
         localStorage.removeItem("userToken");
         localStorage.removeItem("userEmail");
         localStorage.removeItem("userRole");
         setLoggedInEmail(null);
-        setRole(null); // Resetujemy rolę
+        setRole(null);
     };
 
     useEffect(() => {
-        // Pobieranie danych z API
         fetch('http://localhost:4000/api/v1/movie/')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    setMovies(data.movies); // Ustawienie danych filmów
+                    setMovies(data.movies);
                 } else {
                     setError('Błąd podczas pobierania danych.');
                 }
             })
-            .catch(error => {
+            .catch(() => {
                 setError('Błąd połączenia z API.');
             })
             .finally(() => {
-                setLoading(false); // Zakończenie ładowania
+                setLoading(false);
             });
-    }, []); // Efekt wywołuje się tylko raz po załadowaniu komponentu
+    }, []);
+
+    const handleSearch = () => {
+        // Przekierowanie do strony filmu z tytułem wpisanym w input box
+        if (searchTitle.trim()) {
+            navigate(`/Movie/title/${encodeURIComponent(searchTitle)}`);
+        }
+    };
 
     if (loading) {
         return <div>Ładowanie...</div>;
@@ -85,17 +88,32 @@ function HomePage() {
                 <button onClick={handleClick}>Przejdź do SignUp</button>
             )}
 
-            {/* Dodatkowe przyciski dla admina/moderatora */}
-            {role === "admin" || role === "moderator" ? (
+            {/* Dodatkowe przyciski w zależności od roli */}
+            {role === "admin" && (
                 <div>
-                    <Link to="/ManageMovies">
-                        <button>Manage Movies</button>
-                    </Link>
                     <Link to="/ManageAccounts">
                         <button>Manage Accounts</button>
                     </Link>
                 </div>
-            ) : null}
+            )}
+            {role === "moderator" && (
+                <div>
+                    <Link to="/ManageMovies">
+                        <button>Manage Movies</button>
+                    </Link>
+                </div>
+            )}
+
+            {/* Pasek wyszukiwania */}
+            <div className="search-bar">
+                <input
+                    type="text"
+                    placeholder="Wpisz tytuł filmu"
+                    value={searchTitle}
+                    onChange={(e) => setSearchTitle(e.target.value)}
+                />
+                <button onClick={handleSearch}>Szukaj</button>
+            </div>
 
             <h2>Lista filmów</h2>
             <ul>

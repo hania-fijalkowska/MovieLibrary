@@ -63,6 +63,10 @@ function SignUpPage() {
             .then((response) => response.json())
             .then(async(data) => {
                 if (data.success) {
+                    if (!isLogin) {
+                        navigate("/");
+                        return;
+                    }
                     // Zapisanie tokenu, e-maila i roli w localStorage
                     localStorage.setItem("userToken", data.token);
                     localStorage.setItem("userEmail", email);
