@@ -1,0 +1,41 @@
+/* Globalne style dla stopki */
+.footer {
+    background-color: #222;
+    color: #fff;
+    padding: 40px 20px;
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.footer-logo h2 {
+    font-size: 2rem;
+    margin: 0;
+    font-weight: bold;
+}
+
+.footer-social a {
+    color: #fff;
+    font-size: 1.5rem;
+    margin: 0 15px;
+    transition: color 0.3s;
+}
+
+.footer-social a:hover {
+    color: #f39c12;
+}
+
+.footer-bottom {
+    margin-top: 20px;
+    font-size: 0.875rem;
+}
+
+.footer-bottom p {
+    margin: 0;
+}

@@ -1,0 +1,129 @@
+/* Formularz */
+.form {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    margin: 0 auto;
+}
+
+.form input {
+    padding: 8px;
+    margin: 8px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+button {
+    padding: 10px;
+    margin-top: 10px;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+/* Przycisk do zmiany formularza */
+.toggle-form {
+    background-color: transparent;
+    color: #007bff;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.toggle-form:hover {
+    text-decoration: underline;
+}
+
+/* Status logowania */
+.login-status {
+    background-color: #28a745;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.logout-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-left: 10px;
+}
+
+.logout-button:hover {
+    background-color: #c82333;
+}
+
+/* Style dla całej strony */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+    margin-top: 20px;
+}
+
+/* Stworzenie odstępów dla formularza */
+form {
+    margin-top: 20px;
+}
+
+/* Stylizacja dla przycisku "Back to Home" */
+.back-to-home-button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    margin: 20px;
+}
+
+.back-to-home-button:hover {
+    background-color: #0056b3;
+}
+
+/* Stopka */
+footer {
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Responsywność dla mniejszych ekranów */
+@media (max-width: 600px) {
+    .form {
+        width: 90%;
+    }
+
+    .back-to-home-button {
+        width: 100%;
+    }
+}
