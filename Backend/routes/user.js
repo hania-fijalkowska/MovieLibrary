@@ -9,6 +9,37 @@ const validator = require('validator'); // for email vaildation
 const router = express.Router();
 const db = require('../config/db'); // imports the database connection
 
+// get all users without pagination
+router.get('/all', verifyToken, checkRole(['admin']), async (req, res) => {
+    try {
+        const query = `
+            SELECT user_id, username, email, access_level
+            FROM User
+        `;
+        const [users] = await db.execute(query);
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No users found.',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Users retrieved successfully.',
+            data: users,
+        });
+    } catch (error) {
+        console.error('Error fetching all users:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch users.',
+        });
+    }
+});
+
+
 // get user profile
 router.get('/profile', verifyToken, async (req, res) => {
     const userId = Number(req.user.user_id); // access the user ID from the token

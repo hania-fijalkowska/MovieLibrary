@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Footer from "../components/Footer.jsx";
 import BackToHomeButton from "../components/BackToHomeButton.jsx";
 
 function MovieDetails() {
-    const { movieTitle } = useParams(); // Pobieramy movieTitle z URL
-    const [movie, setMovie] = useState(null); // Stan do przechowywania szczegółów filmu
-    const [loading, setLoading] = useState(true); // Stan ładowania
-    const [error, setError] = useState(null); // Stan błędu
+    const { movieTitle } = useParams();
+    const navigate = useNavigate();
+    const [movie, setMovie] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [editFormData, setEditFormData] = useState({
         title: "",
         episodes: "",
@@ -15,15 +16,13 @@ function MovieDetails() {
     });
 
     useEffect(() => {
-        // Kodowanie tytułu, aby obsłużyć spacje i znaki specjalne
         const encodedTitle = encodeURIComponent(movieTitle);
 
-        // Pobieranie szczegółów filmu z API na podstawie tytułu
         fetch(`http://localhost:4000/api/v1/movie/title/${encodedTitle}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    setMovie(data.movie); // Ustawienie danych filmu
+                    setMovie(data.movie);
                     setEditFormData({
                         title: data.movie.title,
                         episodes: data.movie.episodes,
@@ -33,13 +32,13 @@ function MovieDetails() {
                     setError('Błąd podczas pobierania danych filmu.');
                 }
             })
-            .catch(error => {
+            .catch(() => {
                 setError('Błąd połączenia z API.');
             })
             .finally(() => {
-                setLoading(false); // Zakończenie ładowania
+                setLoading(false);
             });
-    }, [movieTitle]); // Efekt wywołuje się przy każdej zmianie movieTitle
+    }, [movieTitle]);
 
     const handleEditInputChange = (e) => {
         const { name, value } = e.target;
@@ -49,10 +48,47 @@ function MovieDetails() {
         });
     };
 
-    const handleEditSubmit = (e) => {
+    const handleEditSubmit = async (e) => {
         e.preventDefault();
-        // Dodaj logikę aktualizacji szczegółów filmu
-        console.log("Edytowanie filmu: ", editFormData);
+
+        const token = localStorage.getItem("userToken");
+
+        if (!token) {
+            console.error("No user token found in localStorage");
+            return;
+        }
+
+        const requestBody = {
+            newTitle: editFormData.title,
+            newEpisodes: editFormData.episodes,
+            newSynopsis: editFormData.synopsis,
+        };
+
+        try {
+            const response = await fetch(`http://localhost:4000/api/v1/movie/${movie.movie_id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            if (editFormData.title === movie.title) {
+                // Jeśli tytuł się nie zmienił, odśwież stronę
+                window.location.reload();
+            } else {
+                // Jeśli tytuł się zmienił, przekieruj na nową stronę
+                const newTitleEncoded = encodeURIComponent(editFormData.title);
+                navigate(`/movie/title/${newTitleEncoded}`);
+            }
+        } catch (error) {
+            console.error("Error updating movie:", error);
+        }
     };
 
     const handleDelete = async () => {
@@ -76,7 +112,7 @@ function MovieDetails() {
             }
 
             console.log("Movie deleted successfully");
-            // Additional logic for handling post-deletion, like redirecting or updating state
+            navigate("/");
         } catch (error) {
             console.error("Error deleting movie:", error);
         }
@@ -94,7 +130,7 @@ function MovieDetails() {
 
     return (
         <div>
-            <BackToHomeButton/>
+            <BackToHomeButton />
             <h1>{movie.title}</h1>
             <p>{movie.synopsis}</p>
             <p>Ocena: {movie.score}</p>
@@ -146,7 +182,7 @@ function MovieDetails() {
                 </div>
             )}
 
-            <Footer/>
+            <Footer />
         </div>
     );
 }
