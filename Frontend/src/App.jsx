@@ -5,6 +5,7 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import ManageMoviesPage from "./pages/ManageMovies.jsx";
 import ManageAccountsPage from "./pages/ManageAccounts.jsx";
 import MovieDetails from "./pages/MovieDetails.jsx";
+import PersonDetails from './pages/PersonDetails';
 
 function App() {
     const token = localStorage.getItem("userToken");
@@ -22,6 +23,7 @@ function App() {
                 <Route path="/Movie/title/:movieTitle" element={<MovieDetails />} />
                 <Route path="/ManageMovies" element={<ManageMoviesPage />} />
                 <Route path="/ManageAccounts" element={<ManageAccountsPage />} />
+                <Route path="/person/:personId" element={<PersonDetails />} />
 
             </Routes>
         </Router>

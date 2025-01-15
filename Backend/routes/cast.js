@@ -19,8 +19,8 @@ router.get('/movie/:movieId/cast', async (req, res) => {
 
     try {
         const query = `
-            SELECT p.first_name, p.last_name, c.cast_name
-            FROM Cast c
+            SELECT p.person_id, p.first_name, p.last_name, c.cast_name
+            FROM moviecast c
             JOIN Person p ON c.person_id = p.person_id
             WHERE c.movie_id = ?
         `;
@@ -115,10 +115,8 @@ router.post('/add', verifyToken, checkRole('moderator'), async (req, res) => {
     }
 
     try {
-        const query = `
-            INSERT INTO Cast (movie_id, person_id, cast_name)
-            VALUES (?, ?, ?)
-        `;
+        const query = `INSERT INTO moviecast (movie_id, person_id, cast_name) VALUES (?, ?, ?)`;
+
         await db.execute(query, [movieId, personId, castName]);
 
         res.status(200).json({
@@ -162,7 +160,7 @@ router.put('/edit', verifyToken, checkRole('moderator'), async (req, res) => {
 
     try {
         const query = `
-            UPDATE Cast
+            UPDATE moviecast
             SET cast_name = ?
             WHERE movie_id = ? AND person_id = ?
         `;
@@ -209,7 +207,7 @@ router.delete('/delete', verifyToken, checkRole('moderator'), async (req, res) =
 
     try {
         const query = `
-            DELETE FROM Cast
+            DELETE FROM moviecast
             WHERE movie_id = ? AND person_id = ?
         `;
         const [result] = await db.execute(query, [movieId, personId]);
