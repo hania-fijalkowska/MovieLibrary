@@ -140,4 +140,49 @@ router.delete('/:movieId', verifyToken, checkRole('user'), async (req, res) => {
     }
 });
 
+
+// GET: Pobierz wszystkie recenzje dla filmu
+router.get('/:movieId', async (req, res) => {
+    const movieId = Number(req.params.movieId);
+
+    if (!movieId || isNaN(movieId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid movie ID.'
+        });
+    }
+
+    const connection = await db.getConnection();
+    try {
+        // Pobranie wszystkich recenzji dla filmu, posortowanych po movie_id i user_id
+        const [reviews] = await connection.execute(
+            'SELECT review, user_id FROM Review WHERE movie_id = ? ORDER BY movie_id DESC, user_id DESC',
+            [movieId]
+        );
+
+        if (!reviews.length) {
+            return res.status(404).json({
+                success: false,
+                message: 'No reviews found for this movie.'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            reviews
+        });
+
+    } catch (error) {
+        console.error('Error fetching reviews:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch reviews.'
+        });
+    } finally {
+        connection.release(); // release the connection back to the pool
+    }
+});
+
+
+
 module.exports = router;

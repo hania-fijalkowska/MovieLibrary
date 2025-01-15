@@ -22,6 +22,7 @@ function App() {
                 <Route path="/Movie/title/:movieTitle" element={<MovieDetails />} />
                 <Route path="/ManageMovies" element={<ManageMoviesPage />} />
                 <Route path="/ManageAccounts" element={<ManageAccountsPage />} />
+
             </Routes>
         </Router>
     );

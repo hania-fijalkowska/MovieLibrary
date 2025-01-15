@@ -11,7 +11,7 @@ function BackToHomeButton() {
 
     return (
         <button onClick={handleClick} className="back-to-home-button">
-            Wróć do strony głównej
+            Back to home page
         </button>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Footer from "../components/Footer.jsx";
-import BackToHomeButton from "../components/BackToHomeButton.jsx";
+import '../styles/HomePage.css'; // Import pliku CSS dla HomePage
 
 function HomePage() {
     const navigate = useNavigate();
@@ -45,11 +45,11 @@ function HomePage() {
                 if (data.success) {
                     setMovies(data.movies);
                 } else {
-                    setError('Błąd podczas pobierania danych.');
+                    setError('Error fetching data.');
                 }
             })
             .catch(() => {
-                setError('Błąd połączenia z API.');
+                setError('Connection error with the API.');
             })
             .finally(() => {
                 setLoading(false);
@@ -57,14 +57,13 @@ function HomePage() {
     }, []);
 
     const handleSearch = () => {
-        // Przekierowanie do strony filmu z tytułem wpisanym w input box
         if (searchTitle.trim()) {
             navigate(`/Movie/title/${encodeURIComponent(searchTitle)}`);
         }
     };
 
     if (loading) {
-        return <div>Ładowanie...</div>;
+        return <div>Loading...</div>;
     }
 
     if (error) {
@@ -72,58 +71,59 @@ function HomePage() {
     }
 
     return (
-        <div>
-            <BackToHomeButton />
-            <h1>HomePage</h1>
+        <div className="home-page">
 
-            {/* Wyświetlanie informacji o logowaniu */}
+            <h1 className="page-title">Welcome to the Home Page!</h1>
+
+            {/* Display login information */}
             {loggedInEmail ? (
                 <div className="login-status">
-                    Witaj, {loggedInEmail} ({role})
+                    Welcome, {loggedInEmail} ({role})
                     <button onClick={handleLogout} className="logout-button">
-                        Wyloguj się
+                        Log out
                     </button>
                 </div>
             ) : (
-                <button onClick={handleClick}>Przejdź do SignUp</button>
+                <button onClick={handleClick} className="signup-button">Go to SignUp</button>
             )}
 
-            {/* Dodatkowe przyciski w zależności od roli */}
+            {/* Additional buttons based on role */}
             {role === "admin" && (
-                <div>
+                <div className="admin-buttons">
                     <Link to="/ManageAccounts">
-                        <button>Manage Accounts</button>
+                        <button className="admin-button">Manage Accounts</button>
                     </Link>
                 </div>
             )}
             {role === "moderator" && (
-                <div>
+                <div className="moderator-buttons">
                     <Link to="/ManageMovies">
-                        <button>Manage Movies</button>
+                        <button className="moderator-button">Manage Movies</button>
                     </Link>
                 </div>
             )}
 
-            {/* Pasek wyszukiwania */}
+            {/* Search bar */}
             <div className="search-bar">
                 <input
                     type="text"
-                    placeholder="Wpisz tytuł filmu"
+                    placeholder="Enter movie title"
                     value={searchTitle}
                     onChange={(e) => setSearchTitle(e.target.value)}
+                    className="search-input"
                 />
-                <button onClick={handleSearch}>Szukaj</button>
+                <button onClick={handleSearch} className="search-button">Search</button>
             </div>
 
-            <h2>Lista filmów</h2>
-            <ul>
+            <h2>Movie List</h2>
+            <ul className="movies-list">
                 {movies.map((movie) => (
-                    <li key={movie.movie_id}>
-                        <Link to={`/Movie/title/${encodeURIComponent(movie.title)}`}>
-                            <h3>{movie.title} ({movie.episodes} epizodów)</h3>
+                    <li key={movie.movie_id} className="movie-item">
+                        <Link to={`/Movie/title/${encodeURIComponent(movie.title)}`} className="movie-link">
+                            <h3 className="movie-title">{movie.title} ({movie.episodes} episodes)</h3>
                         </Link>
-                        <p>{movie.synopsis}</p>
-                        <p>Ocena: {movie.score}</p>
+                        <p className="movie-synopsis">{movie.synopsis}</p>
+                        <p className="movie-score">Rating: {movie.score}</p>
                     </li>
                 ))}
             </ul>

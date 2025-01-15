@@ -1,41 +1,43 @@
-/* Globalne style dla stopki */
+/* Footer Styles */
 .footer {
-    background-color: #222;
+    background-color: #1a1a1a;
     color: #fff;
-    padding: 40px 20px;
-    font-family: Arial, sans-serif;
-    text-align: center;
+    padding: 40px 0;
+    font-family: 'Arial', sans-serif;
+    border-top: 3px solid #fff;  /* Białe obramowanie na górze */
 }
 
-.footer-content {
+.footer-container {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;  /* Wyśrodkowanie zawartości */
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.footer-logo {
+    margin-bottom: 20px;  /* Odstęp między logo a dolną częścią */
+    text-align: center;  /* Wyśrodkowanie logo */
 }
 
 .footer-logo h2 {
-    font-size: 2rem;
-    margin: 0;
-    font-weight: bold;
+    margin-bottom: 10px;
+    font-size: 28px;
 }
 
-.footer-social a {
-    color: #fff;
-    font-size: 1.5rem;
-    margin: 0 15px;
-    transition: color 0.3s;
-}
-
-.footer-social a:hover {
-    color: #f39c12;
+.footer-logo p {
+    font-size: 16px;
+    color: #ccc;
 }
 
 .footer-bottom {
-    margin-top: 20px;
-    font-size: 0.875rem;
+    text-align: center;
+    margin-top: 30px;
+    font-size: 14px;
 }
 
 .footer-bottom p {
-    margin: 0;
+    color: #ccc;
 }
