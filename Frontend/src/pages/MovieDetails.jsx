@@ -243,7 +243,6 @@ function MovieDetails() {
         <div className="movie-details">
             <BackToHomeButton />
             <div className="movie-header">
-                <img src={movie.poster_url} alt={movie.title} />
                 <h1>{movie.title}</h1>
                 <p>{movie.synopsis}</p>
                 <p>Rating: {movie.score}</p>
